@@ -7,8 +7,9 @@ services:
     volumes:
       - ./uploads:/directus/uploads
       - ./database:/directus/database
-      - ./kinder-checkin/dist:/directus/extensions/endpoints/kinder-checkin
-      - ./kinder-checkin/migrations:/directus/extensions/migrations
+      - ./endpoints/dist:/directus/extensions/endpoints/kinder-checkin-endpoints
+      - ./hook/dist:/directus/extensions/hooks/kinder-checkin-hooks
+      - ./migrations:/directus/extensions/migrations
     environment:
       KEY: '255d861b-5ea1-5996-9aa3-922530ec40b1'
       SECRET: '6116487b-cda1-52c2-b5b5-c8022c45e263'
@@ -20,4 +21,7 @@ services:
       ADMIN_PASSWORD: 'change_me'
 
       EXTENSIONS_AUTO_RELOAD: 'true'
+
+      EMAIL_TRANSPORT: 'ses'
+      EMAIL_FROM: 'trinhthuy210100@gmail.com'
 
