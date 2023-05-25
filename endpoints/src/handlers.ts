@@ -8,12 +8,13 @@ export const handleUpsertSetting = (ctx: EndpointExtensionContext) => async (req
 
   const body = req.body;
 
-  const user = await ctx.database
-    .table("directus_users")
-    .where("id", req.accountability.user)
-    .first(["class_id"])
+  const class1 = await ctx.database
+    .table("classes")
+    .where("teachers", req.accountability.user)
+    .where("status", "active")
+    .first(["id"])
     .catch(() => false);
-  if (!user) {
+  if (!class1) {
     res.status(403).send(new ForbiddenException());
     return;
   }
@@ -23,7 +24,7 @@ export const handleUpsertSetting = (ctx: EndpointExtensionContext) => async (req
     .insert({
       key: body.key,
       value: body.value,
-      class: user.class_id || 0,
+      class: class1.id || 0,
     })
     .onConflict(["key", "class"])
     .merge(["value"])
@@ -37,9 +38,9 @@ export const handleUpsertSetting = (ctx: EndpointExtensionContext) => async (req
   res.send({ success: true });
 };
 
-export const handleDownloadAvatarWithFrame = (_ctx: EndpointExtensionContext) => async (_req: any, res: Response) => {
-  const frameBuffer = await compositeImage("http://3.0.100.91:8055/assets/30757ffb-bb10-4750-abcc-480104670e87");
-  const desBuffer = await compositeImage("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRROt7YUKa7excpJt4CR59ZwHzhWDfV1mr0eQ&usqp=CAU")
+export const handleDownloadAvatarWithFrame = (_ctx: EndpointExtensionContext, des:string, frame:string) => async (_req: any, res: Response) => {
+  const frameBuffer = await compositeImage(frame);
+  const desBuffer = await compositeImage(des)
 
   const image = await sharp(desBuffer)
     .resize({
@@ -63,3 +64,31 @@ export const handleDownloadAvatarWithFrame = (_ctx: EndpointExtensionContext) =>
 async function compositeImage(inputUrl: string): Promise<Buffer> {
   return (await axios({ url: inputUrl, responseType: "arraybuffer" })).data as Buffer;
 }
+
+export const handleUpsertCico = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { ForbiddenException } = ctx.exceptions;
+
+  const body = req.body;
+
+  const data = await ctx.database
+    .table("cico_photos")
+    .insert({
+      checkin: body.checkin,
+      checkout: body.checkout,
+      absence_reason: body.absence_reason,
+      absence_forwarned: body.absence_forwarned,
+      student:body.student,
+      class_id:body.class_id,
+      datetime:body.datetime,
+    })
+    .onConflict(["student", "datetime"])
+    .merge(["checkin", "checkout", "absence_reason", "absence_forwarned"])
+    .catch((err: Error) => err);
+
+  if (data instanceof Error) {
+    res.status(500).send(data);
+    return;
+  }
+
+  res.send({ success: true });
+};
