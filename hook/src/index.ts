@@ -1,6 +1,9 @@
 import { defineHook } from "@directus/extensions-sdk";
 import type { Transporter } from "nodemailer";
-import {handleDownloadAvatarWithFrame} from "../../endpoints/src/handlers";
+import sharp from "sharp";
+import axios from "axios";
+
+const ASSET_URL = "http://3.0.100.91:8055/assets";
 
 export default defineHook(({ action }, context) => {
   const { MailService } = context.services;
@@ -13,40 +16,77 @@ export default defineHook(({ action }, context) => {
 
     const mailer: Transporter = mailService.mailer;
 
-		const studentFullName = student.last_name + " " + student.first_name
+    const studentFullName = student.last_name + " " + student.first_name;
 
-    const frameSettings = await database.table("settings").where("class", input.payload.class_id).where("key","frame").first();
-    let frame
-    if (frameSettings.status=="active" && frameSettings.start_time<=new Date() && frameSettings.end_date>=new Date()) {
-      frame = await database.table("frames").where("id", frameSettings.value).first();
+    const frameSettings = await database
+      .table("settings")
+      .where("class", input.payload.class_id)
+      .where("key", "frame")
+      .first();
+
+    let frameURL = "";
+    if (
+      frameSettings &&
+      Number(frameSettings.value) > 0 &&
+      frameSettings.status === "active" &&
+      new Date(frameSettings.start_time) <= new Date() &&
+      new Date(frameSettings.end_time) >= new Date()
+    ) {
+      const frame = await database.table("frames").where("id", frameSettings.value).first();
+      if (frame && frame.frame != "") {
+        frameURL = `${ASSET_URL}/${frame.frame}`;
+      }
     }
 
     switch (input.collection) {
       case "cico_photos":
-        if (input.payload.checkin!="") {
-          if (frame!=null){
-          input.payload.checkin=handleDownloadAvatarWithFrame(context,frame.frame, input.payload.checkin);
+        let buffer: Buffer;
+
+        if (input.payload.checkin) {
+          const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
+
+          if (frameURL != "") {
+            buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
+          } else {
+            buffer = await compositeImage(checkinURL);
           }
 
           await mailer.sendMail({
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
             to: "19120390@student.hcmus.edu.vn",
-            subject:"CHECKED IN: "+studentFullName +" - "+ new Date().toDateString(),
-            html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="http://3.0.100.91:8055/assets/${input.payload.checkin}"/>`,
+            subject: "CHECKED IN: " + studentFullName + " - " + new Date(input.payload.datetime).toDateString(),
+            html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
+            attachments: [
+              {
+                filename: 'image.png',
+                content: buffer,
+                cid: 'student_checkin_id'
+              }
+            ]
           });
           console.log("Email sent");
         }
 
-        if (input.payload.checkout!="") {
-          if (frame!=null){
-            input.payload.checkout=handleDownloadAvatarWithFrame(context,frame.frame, input.payload.checkout);
+        if (input.payload.checkout) {
+          const checkoutURL = `${ASSET_URL}/${input.payload.checkout}`;
+          if (frameURL != "") {
+            buffer = await handleDownloadAvatarWithFrame(checkoutURL, frameURL);
+          } else {
+            buffer = await compositeImage(checkoutURL);
           }
 
           await mailer.sendMail({
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
             to: "19120390@student.hcmus.edu.vn",
-            subject:"CHECKED OUT: "+studentFullName +" - "+ new Date().toDateString(),
-            html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="http://3.0.100.91:8055/assets/${input.payload.checkin}"/>`,
+            subject: "CHECKED OUT: " + studentFullName + " - " + new Date(input.payload.datetime).toDateString(),
+            html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
+            attachments: [
+              {
+                filename: 'image.png',
+                content: buffer,
+                cid: 'student_checkout_id'
+              }
+            ]
           });
           console.log("Email sent");
         }
@@ -57,3 +97,29 @@ export default defineHook(({ action }, context) => {
     return input;
   });
 });
+
+const handleDownloadAvatarWithFrame = async (des: string, frame: string): Promise<Buffer> => {
+  const frameBuffer = await compositeImage(frame);
+  const desBuffer = await compositeImage(des);
+
+  const image = await sharp(desBuffer)
+    .resize({
+      width: 400,
+      height: 400,
+    })
+    .composite([
+      {
+        input: frameBuffer,
+        top: 0,
+        left: 0,
+      },
+    ])
+    .png()
+    .toBuffer();
+
+  return image;
+};
+
+async function compositeImage(inputUrl: string): Promise<Buffer> {
+  return (await axios({ url: inputUrl, responseType: "arraybuffer" })).data as Buffer;
+}

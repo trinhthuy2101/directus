@@ -3,7 +3,7 @@
   return {
     name: 'ignore-sharp',
     resolveId(importee) {
-      if (importee.startsWith('nodemailer') || importee.startsWith('axios')) {
+      if (importee.startsWith('nodemailer') || importee.startsWith('axios') || importee.startsWith('sharp')) {
         return { id: importee, external: true };
       }
 

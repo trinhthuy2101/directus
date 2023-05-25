@@ -1,5 +1,5 @@
 import { defineEndpoint } from "@directus/extensions-sdk";
-import { handleUpsertSetting, handleDownloadAvatarWithFrame } from "./handlers";
+import { handleUpsertSetting, handleUpsertCico } from "./handlers";
 
 export default defineEndpoint({
   id: "exts",
