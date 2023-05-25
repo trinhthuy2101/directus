@@ -25,13 +25,15 @@ export default defineHook(({ action }, context) => {
       .first();
 
     let frameURL = "";
+    let start = new Date(frameSettings.start_time);
+    let end = new Date(frameSettings.end_time);
     if (
       frameSettings &&
       Number(frameSettings.value) > 0 &&
       frameSettings.status === "active" &&
-      new Date(frameSettings.start_time) <= new Date() &&
-      new Date(frameSettings.end_time) >= new Date()
-    ) {
+      (!(start.getTime() === start.getTime()) || start <= new Date()) &&
+      (!(end.getTime() === end.getTime()) || end >= new Date())
+    ){
       const frame = await database.table("frames").where("id", frameSettings.value).first();
       if (frame && frame.frame != "") {
         frameURL = `${ASSET_URL}/${frame.frame}`;
