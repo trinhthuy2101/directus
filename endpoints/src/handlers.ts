@@ -48,7 +48,7 @@ export const handleUpsertCico = (ctx: EndpointExtensionContext) => async (req: a
     .table("cico_photos")
     .insert(body)
     .onConflict(["unique_date_student_id"])
-    .merge(["checkin", "checkout", "absence_reason", "absence_forwarned"])
+    .merge(["checkin", "checkout", "absence_reason", "absence_forewarned"])
     .catch((err: Error) => err);
 
   if (data instanceof Error) {

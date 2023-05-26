@@ -1,3 +1,4 @@
+import type { ActionHandler, HookExtensionContext } from "@directus/types";
 import { defineHook } from "@directus/extensions-sdk";
 import type { Transporter } from "nodemailer";
 import sharp from "sharp";
@@ -5,15 +6,14 @@ import axios from "axios";
 
 const ASSET_URL = "http://3.0.100.91:8055/assets";
 
-export default defineHook(({ action }, context) => {
-  const { MailService } = context.services;
-
-  action("items.create", async (input, { database, schema }) => {
+const onCreateItems =
+  (context: HookExtensionContext): ActionHandler =>
+  async (input, { database, schema }) => {
     if (!["cico_photos", "students"].includes(input.collection)) return input;
-    const mailService = new MailService({ schema, knex: database });
 
     const student = await database.table("students").where("id", input.payload.student).first();
 
+    const mailService = new context.services.MailService({ schema, knex: database });
     const mailer: Transporter = mailService.mailer;
 
     const studentFullName = student.last_name + " " + student.first_name;
@@ -33,7 +33,7 @@ export default defineHook(({ action }, context) => {
       frameSettings.status === "active" &&
       (!(start.getTime() === start.getTime()) || start <= new Date()) &&
       (!(end.getTime() === end.getTime()) || end >= new Date())
-    ){
+    ) {
       const frame = await database.table("frames").where("id", frameSettings.value).first();
       if (frame && frame.frame != "") {
         frameURL = `${ASSET_URL}/${frame.frame}`;
@@ -60,11 +60,11 @@ export default defineHook(({ action }, context) => {
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
             attachments: [
               {
-                filename: 'image.png',
+                filename: "image.png",
                 content: buffer,
-                cid: 'student_checkin_id'
-              }
-            ]
+                cid: "student_checkin_id",
+              },
+            ],
           });
           console.log("Email sent");
         }
@@ -84,11 +84,11 @@ export default defineHook(({ action }, context) => {
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
             attachments: [
               {
-                filename: 'image.png',
+                filename: "image.png",
                 content: buffer,
-                cid: 'student_checkout_id'
-              }
-            ]
+                cid: "student_checkout_id",
+              },
+            ],
           });
           console.log("Email sent");
         }
@@ -97,7 +97,11 @@ export default defineHook(({ action }, context) => {
     }
 
     return input;
-  });
+  };
+
+export default defineHook(({ action }, context) => {
+  action("items.create", onCreateItems(context));
+  context.emitter.onAction("items.create", onCreateItems(context))
 });
 
 const handleDownloadAvatarWithFrame = async (des: string, frame: string): Promise<Buffer> => {
