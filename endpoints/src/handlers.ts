@@ -44,14 +44,27 @@ export const handleUpsertCico = (ctx: EndpointExtensionContext) => async (req: a
   let dateString = "" + m.getUTCFullYear() + (m.getUTCMonth() + 1) + m.getUTCDate();
   body.unique_date_student_id = `${body.student}_${dateString}`;
 
+  let mergeFields = ["checkin", "checkout", "absence_reason", "absence_forewarned"].reduce((prev, value) => {
+    prev.set(value, true)
+    return prev
+  }, new Map<string, boolean>());
+
+  
+  for (const key of mergeFields.keys()) {
+    if (!body[key]) {
+      mergeFields.delete(key)
+    }
+  }
+
   const data = await ctx.database
     .table("cico_photos")
     .insert(body)
     .onConflict(["unique_date_student_id"])
-    .merge(["checkin", "checkout", "absence_reason", "absence_forewarned"])
+    .merge([...mergeFields.keys()])
     .catch((err: Error) => err);
 
   if (data instanceof Error) {
+    console.log('failed to upsert cico_photos', data)
     res.status(500).send(data);
     return;
   }
