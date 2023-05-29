@@ -44,6 +44,8 @@ export const handleUpsertCico = (ctx: EndpointExtensionContext) => async (req: a
   let dateString = "" + m.getUTCFullYear() + (m.getUTCMonth() + 1) + m.getUTCDate();
   body.unique_date_student_id = `${body.student}_${dateString}`;
 
+  body.datetime=m.getTime();
+
   let mergeFields = ["checkin", "checkout", "absence_reason", "absence_forewarned"].reduce((prev, value) => {
     prev.set(value, true)
     return prev
