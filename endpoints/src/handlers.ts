@@ -6,23 +6,12 @@ export const handleUpsertSetting = (ctx: EndpointExtensionContext) => async (req
 
   const body = req.body;
 
-  const class1 = await ctx.database
-    .table("classes")
-    .where("teachers", req.accountability.user)
-    .where("status", "active")
-    .first(["id"])
-    .catch(() => false);
-  if (!class1) {
-    res.status(403).send(new ForbiddenException());
-    return;
-  }
-
   const data = await ctx.database
     .table("settings")
     .insert({
       key: body.key,
       value: body.value,
-      class: class1.id || 0,
+      class: body.class || 0,
     })
     .onConflict(["key", "class"])
     .merge(["value"])
@@ -41,9 +30,12 @@ export const handleUpsertCico = (ctx: EndpointExtensionContext) => async (req: a
 
 
   let m = new Date(body.datetime);
-  let dateString = "" + m.getUTCFullYear() + (m.getUTCMonth() + 1) + m.getUTCDate();
+  let month=String(m.getMonth() + 1).padStart(2, '0')
+  let day=String(m.getDate()).padStart(2, '0')
+  let dateString = "" + m.getUTCFullYear() + month + day;
   body.unique_date_student_id = `${body.student}_${dateString}`;
-
+  let date = new Date(m.getUTCFullYear() + "-" + month + "-" + day)
+  body.date=date.getTime();
   body.datetime=m.getTime();
 
   let mergeFields = ["checkin", "checkout", "absence_reason", "absence_forewarned"].reduce((prev, value) => {
