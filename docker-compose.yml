@@ -1,21 +1,42 @@
 version: '3'
 services:
+  # extensions:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./hook/dist:/app/hook/dist
+  #     - ./endpoints/dist:/app/endpoints/dist
+  db:
+    image: postgres
+    environment:
+      POSTGRES_DB: directus
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change_me
+    ports:
+      - 5432:5432
+    volumes:
+      - ./database:/directus/database
   directus:
     image: directus/directus:9.24
     ports:
       - 8055:8055
     volumes:
       - ./uploads:/directus/uploads
-      - ./database:/directus/database
       - ./endpoints/dist:/directus/extensions/endpoints/kinder-checkin-endpoints
       - ./hook/dist:/directus/extensions/hooks/kinder-checkin-hooks
-      - ./migrations:/directus/extensions/migrations
+      # - ./migrations:/directus/extensions/migrations
     environment:
       KEY: '255d861b-5ea1-5996-9aa3-922530ec40b1'
       SECRET: '6116487b-cda1-52c2-b5b5-c8022c45e263'
 
-      DB_CLIENT: 'sqlite3'
-      DB_FILENAME: './database/data.db'
+      DB_CLIENT: 'postgres'
+      DB_HOST: 'db'
+      DB_PORT: '5432'
+      DB_DATABASE: 'directus'
+      DB_USER: 'postgres'
+      DB_PASSWORD: 'change_me'
+      # DB_CONNECTION_STRING: 'postgres://postgres:change_me@db:5432/directus'
 
       ADMIN_EMAIL: 'trinhthuy210100@gmail.com'
       ADMIN_PASSWORD: 'change_me'
