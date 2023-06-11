@@ -1,0 +1,44 @@
+@startuml kinder-checkin context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include FONTAWESOME/aws.puml
+!include FONTAWESOME/node_js.puml
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/database.puml
+!include FONTAWESOME/mobile_alt.puml
+!include FONTAWESOME/server.puml
+
+AddElementTag("thirdparty", $bgColor="#888888")
+
+HIDE_STEREOTYPE()
+
+Person(teacher, "Teacher", "People who use checkin app", $sprite="users")
+Person(admin, "Teacher/Admin", "People who use checkin web", $sprite="users")
+
+Container(app, "Mobile App", "React Native", $sprite="mobile_alt")
+Container(web, "Directus Admin", "Javascript, VueJS", $sprite="node_js")
+
+System_Boundary(ec2,"AWS EC2","Amazon Elastic Compute Cloud"){
+  Container(direct, "Directus Backend", "Javascript, NodeJS 18", $sprite="node_js")
+  ContainerDb(db, "Database", "Postgres", $sprite="database")
+}
+
+Container(ses, "AWS SES", "Amazon Simple Email Service", $sprite="aws", $tags="thirdparty")
+
+Container(payoo, "PAYOO", "Face Recognition Service", $sprite="server", $tags="thirdparty")
+
+Rel(teacher, app, "Use", "")
+Rel(admin, web, "Use", "")
+
+Rel(app, direct, "Request", "http")
+Rel(web, direct, "Request", "http")
+Rel(app, payoo, "Request", "https")
+
+
+Rel(direct, db, "Read/Write", "TCP")
+Rel(direct, ses, "Send email", "https")
+
+' Rel_R(api, db, "Reads/Writes")
+
+@enduml
