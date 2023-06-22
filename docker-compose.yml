@@ -20,7 +20,7 @@ services:
   directus:
     image: directus/directus:9.24
     ports:
-      - 8055:8055
+      - 80:8055
     volumes:
       - ./uploads:/directus/uploads
       - ./endpoints/dist:/directus/extensions/endpoints/kinder-checkin-endpoints
