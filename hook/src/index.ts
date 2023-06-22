@@ -15,12 +15,16 @@ const onCreateItems =
 
     const mailService = new context.services.MailService({ schema, knex: database });
     const mailer: Transporter = mailService.mailer;
+    let mailReceiver = "19120390@student.hcmus.edu.vn";
+    if (student.parents_email) {
+      mailReceiver = student.parents_email;
+    }
 
     const studentFullName = student.last_name + " " + student.first_name;
 
     const frameSettings = await database
       .table("settings")
-      .where("class", input.payload.class_id)
+      .where("class", student.current_class)
       .where("key", "frame")
       .first();
 
@@ -55,7 +59,7 @@ const onCreateItems =
 
           await mailer.sendMail({
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
-            to: "19120390@student.hcmus.edu.vn",
+            to: mailReceiver,
             subject: "CHECKED IN: " + studentFullName + " - " + new Date(input.payload.datetime).toDateString(),
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
             attachments: [
@@ -79,7 +83,7 @@ const onCreateItems =
 
           await mailer.sendMail({
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
-            to: "19120390@student.hcmus.edu.vn",
+            to: mailReceiver,
             subject: "CHECKED OUT: " + studentFullName + " - " + new Date(input.payload.datetime).toDateString(),
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
             attachments: [
