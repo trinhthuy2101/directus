@@ -1,21 +1,8 @@
 import { EndpointExtensionContext } from "@directus/shared/types";
 import { Response } from "express";
-import { Knex } from 'knex';
 import axios from "axios";
 
-const knexConfig: Knex.Config = {
-  client: 'mysql', // Replace with your preferred database client
-  connection: {
-    host: 'localhost',
-    user: 'your_username',
-    password: 'your_password',
-    database: 'your_database_name',
-  },
-  // Other configuration options such as migrations, seeds, etc.
-};
-
-const knex: Knex = Knex(knexConfig);
-const connection = knex;
+const ASSET_URL = "http://3.0.100.91:8055/assets";
 
 export const handleUpsertSetting =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
@@ -114,129 +101,167 @@ export const updateClassFaceId =
       .table("students")
       .where("current_class", body.id);
 
-      const ASSET_URL = "http://3.0.100.91:8055/assets";
-
     let list = [];
     let failed_list = [];
+
+  if (body.update_mode=="1") {
+    let count=0;
     for (let s of students) {
-      if (body.update_mode=="1") {
-        if (s.frontal_face && s.left_side_face && s.right_side_face) {
-          const frontal=(await compositeImage(`${ASSET_URL}/${s.frontal_face}`)).toString('base64');
-          const left=(await compositeImage(`${ASSET_URL}/${s.left_side_face}`)).toString('base64');
-          const right=(await compositeImage(`${ASSET_URL}/${s.right_side_face}`)).toString('base64');
+      if (s.frontal_face && s.left_side_face && s.right_side_face) {
+        const frontal=(await compositeImage(`${ASSET_URL}/${s.frontal_face}`)).toString('base64');
+        const left=(await compositeImage(`${ASSET_URL}/${s.left_side_face}`)).toString('base64');
+        const right=(await compositeImage(`${ASSET_URL}/${s.right_side_face}`)).toString('base64');
 
-          if (s.face_id) {
-            const result01=await axios.post('http://27.74.253.109:19692/checkin_api/register',{
-              merchant_id: '8',
-              group_id: '8',
-              person_id: s.face_id,
-              force:'0',
-              image_base64s: 
-              {
-                'frontal': frontal,
-                'left': left,
-                'right': right
-              }
-            })
+        if (s.face_id) {
+          const newFaceResult=await registerNewFace(s.face_id,frontal,left,right)
 
-            if (result01.data.code=='1000') {
-              list.push({"id":s.id,"face_id":s.face_id})
-            } else{
-              failed_list.push({"id":s.id,"name":s.last_name+" "+s.first_name+'\n'})
-            }
+          console.log(newFaceResult.data)
 
-            console.log("thuyyy_result01: ",result01.data)
+          if (newFaceResult.data.code!='1000'&&newFaceResult.data.code!='709') {
+            failed_list.push(++count+'. '+s.last_name+" "+s.first_name+" : "+newFaceResult.data.status)
           }
-          else{
-            const new_face_id02 = await axios.post("http://27.74.253.109:19692/web_api/person", {
-            merchant_id: 8,
-            group_id: 8,
-            person_fullname: s.last_name+" "+s.first_name,
-            });
+        }
+        else{
+          const newPersonResult = await registerNewPerson(s.last_name+" "+s.first_name)
+          console.log(newPersonResult.data)
+          const newFaceResult= await registerNewFace(newPersonResult.data.person_id,frontal,left,right)
+          console.log(newFaceResult.data)
 
-            console.log("thuyyy_new_face_id02: ",new_face_id02.data)
-  
-            const result02=await axios.post('http://27.74.253.109:19692/checkin_api/register',{
-              merchant_id: '8',
-              group_id: '8',
-              person_id: new_face_id02.data.data.person_id,
-              force:'0',
-              image_base64s: 
-              {
-                'frontal': frontal,
-                'left': left,
-                'right': right
-              }
-            })
-
-            if (result02.data.code=='1000') {
-              list.push({"id":s.id,"face_id":s.new_face_id02.data.data.person_id})
-            }else{
-              failed_list.push({"id":s.id,"name":s.last_name+" "+s.first_name+'\n'})
-            }
-
-            console.log("thuyyy_result02: ",result02.data)
+          if (newFaceResult.data.code=='1000'||newFaceResult.data.code=='709') {
+            list.push({"id":s.id,"face_id":newFaceResult.data.person_id})
+          }else{
+            failed_list.push(++count+'. '+s.last_name+" "+s.first_name+": "+newFaceResult.data.status)
           }
         }
       }
       else{
-        if(s.face_id==""&&s.frontal_face&&s.left_side_face&&s.right_side_face){
+        failed_list.push(++count+'. '+s.last_name+" "+s.first_name+" : Student has not provided face's images")
+      }
+    }
+  } else{
+    let count=0;
+    for (let s of students) {
+      if(s.face_id==null){
+        if (s.frontal_face&&s.left_side_face&&s.right_side_face){
           const frontal=(await compositeImage(`${ASSET_URL}/${s.frontal_face}`)).toString('base64');
           const left=(await compositeImage(`${ASSET_URL}/${s.left_side_face}`)).toString('base64');
           const right=(await compositeImage(`${ASSET_URL}/${s.right_side_face}`)).toString('base64');
 
-          const new_face_id03 = await axios.post("http://27.74.253.109:19692/web_api/person", {
-            merchant_id: 8,
-            group_id: 8,
-            person_fullname: s.last_name+" "+s.first_name,
-          });
-  
-          const result03=await axios.post('http://27.74.253.109:19692/checkin_api/register',{
-            merchant_id: '8',
-            group_id: '8',
-            person_id: new_face_id03.data.data.person_id,
-            force:'0',
-            image_base64s: 
-            {
-              'frontal': frontal,
-              'left': left,
-              'right': right
-            }
-          })
+          const newPersonResult = await registerNewPerson(s.last_name+" "+s.first_name)
+          console.log(newPersonResult.data)
+          const newFaceResult=await registerNewFace(newPersonResult.data.person_id,frontal,left,right)
+          console.log(newFaceResult.data)
 
-          if (result03.data.code=='1000') {
-            list.push({"id":s.id,"face_id":s.new_face_id02.data.data.person_id})
+          if (newFaceResult.data.code=='1000'||newFaceResult.data.code=='709') {
+            list.push({"id":s.id,"face_id":newFaceResult.data.person_id})
           }else{
-            failed_list.push({"id":s.id,"name":s.last_name+" "+s.first_name+'\n'})
+            failed_list.push(++count+'. '+s.last_name+" "+s.first_name+": "+newFaceResult.data.status)
           }
-
-          console.log("thuyyy_result03: ",result03.data)
+        } else{
+          failed_list.push(++count+'. '+s.last_name+" "+s.first_name+" : Student has not provided face's images")
+        }
       }
     }
+  }
+  
+  console.log(list)
+  console.log(failed_list)
+  
+  if (list.length>0) {
+    performBatchUpdate(ctx,list);
+  }
 
-    performBatchUpdate(list);
-    
-    console.log("thuyyy_list: ",list)
-    console.log("thuyyy_failed_list: ",failed_list)
+  if (failed_list.length>0) {
+    res.status(500).send({ success: true, failed_list: failed_list.join('\n\n') });
+  }
+  else{
+    res.send({ success: true});
+  }
+}
 
-    res.send({ success: true, failed_list: failed_list });
-    };
-    
+export const updateStudentsFaceId =
+  (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const studentIds = req.body.students;
+  const studentIds1=studentIds.replace(/\[/g, "").replace(/\]/g, "").split(',');
+
+  const students = await database
+  .select(
+    "id",
+    "last_name",
+    "first_name",
+    "face_id",
+    "frontal_face",
+    "left_side_face",
+    "right_side_face"
+  )
+  .from("students")
+  .whereIn("id", studentIds1);
+
+  let list = [];
+  let failed_list = [];
+  let count=0;
+
+  for (let s of students) {
+    if (s.frontal_face && s.left_side_face && s.right_side_face) {
+      const frontal=(await compositeImage(`${ASSET_URL}/${s.frontal_face}`)).toString('base64');
+      const left=(await compositeImage(`${ASSET_URL}/${s.left_side_face}`)).toString('base64');
+      const right=(await compositeImage(`${ASSET_URL}/${s.right_side_face}`)).toString('base64');
+
+      if (s.face_id) {
+        const newFaceResult=await registerNewFace(s.face_id,frontal,left,right)
+        console.log(newFaceResult.data)
+
+        if (newFaceResult.data.code!='1000'&&newFaceResult.data.code!='709') {
+          failed_list.push(++count+'. '+s.last_name+" "+s.first_name+" : "+newFaceResult.data.status)
+        }
+      }
+      else{
+        const newPersonResult = await registerNewPerson(s.last_name+" "+s.first_name)
+        console.log(newPersonResult.data)
+        const newFaceResult= await registerNewFace(newPersonResult.data.person_id,frontal,left,right)
+        console.log(newFaceResult.data)
+
+        if (newFaceResult.data.code=='1000'||newFaceResult.data.code=='709') {
+          list.push({"id":s.id,"face_id":newFaceResult.data.person_id})
+        } else{
+          failed_list.push(++count+'. '+s.last_name+" "+s.first_name+": "+newFaceResult.data.status)
+        }
+      }
+    }
+    else{
+      failed_list.push(++count+'. '+s.last_name+" "+s.first_name+" : Student has not provided face's images")
+    }
+  }
+  
+  console.log(list)
+  console.log(failed_list)
+
+  if (list.length>0) {
+    performBatchUpdate(ctx,list);
+  }
+
+  if (failed_list.length>0) {
+    res.status(500).send({ success: true, failed_list: failed_list.join('\n\n') });
+  }
+  else{
+    res.send({ success: true});
+  }
 }
 
 async function compositeImage(inputUrl: string): Promise<Buffer> {
   return (await axios({ url: inputUrl, responseType: "arraybuffer" })).data as Buffer;
 };
 
-function performBatchUpdate(students) {
-  return connection.transaction(trx => {
+function performBatchUpdate(ctx:EndpointExtensionContext,students) {
+  const { database } = ctx;
+  return database.transaction(trx => {
     const queries =[];
     students.forEach(s => {
-        const query = connection('users')
+        const query = database('students')
             .where('id', s.id)
             .update({
-                lastActivity: s.lastActivity,
-                points: s.points,
+                face_id: s.face_id
             })
             .transacting(trx); // This makes every update be in the same transaction
         queries.push(query);
@@ -248,93 +273,25 @@ function performBatchUpdate(students) {
   }); 
 }
 
-export const updateStudentsFaceId =
-  (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
-    const { database } = ctx;
-    const studentIds = req.body.students;
-
-    const students = await database
-    .select(
-      "id",
-      "last_name",
-      "first_name",
-      "face_id",
-      "frontal_face",
-      "left_side_face",
-      "right_side_face"
-    )
-    .from("students")
-    .whereIn("id", studentIds);
-
-    const ASSET_URL = "http://3.0.100.91:8055/assets";
-
-    let list = [];
-    let failed_list = [];
-    for (let s of students) {
-    if (s.frontal_face && s.left_side_face && s.right_side_face) {
-      const frontal=(await compositeImage(`${ASSET_URL}/${s.frontal_face}`)).toString('base64');
-      const left=(await compositeImage(`${ASSET_URL}/${s.left_side_face}`)).toString('base64');
-      const right=(await compositeImage(`${ASSET_URL}/${s.right_side_face}`)).toString('base64');
-
-      if (s.face_id) {
-        const result01 = await axios.post('http://27.74.253.109:19692/checkin_api/register',{
-          merchant_id: '8',
-          group_id: '8',
-          person_id: s.face_id,
-          force:'0',
-          image_base64s: 
-          {
-            'frontal': frontal,
-            'left': left,
-            'right': right
-          }
-        })
-
-        if (result01.data.code=='1000') {
-          list.push({"id":s.id,"face_id":s.face_id})
-        } else{
-          failed_list.push({"id":s.id,"name":s.last_name+" "+s.first_name+'\n'})
-        }
-
-        console.log("thuyyy_result01: ",result01.data)
-      }
-      else{
-        const new_face_id02 = await axios.post("http://27.74.253.109:19692/web_api/person", {
-        merchant_id: 8,
-        group_id: 8,
-        person_fullname: s.last_name+" "+s.first_name,
-        });
-
-        console.log("thuyyy_new_face_id02: ",new_face_id02.data)
-
-        const result02=await axios.post('http://27.74.253.109:19692/checkin_api/register',{
-          merchant_id: '8',
-          group_id: '8',
-          person_id: new_face_id02.data.data.person_id,
-          force:'0',
-          image_base64s: 
-          {
-            'frontal': frontal,
-            'left': left,
-            'right': right
-          }
-        })
-
-        if (result02.data.code == '1000') {
-          list.push({"id":s.id,"face_id":s.new_face_id02.data.data.person_id})
-        }else{
-          failed_list.push({"id":s.id,"name":s.last_name+" "+s.first_name+'\n'})
-        }
-
-        console.log("thuyyy_result02: ",result02.data)
-      }
+async function registerNewFace(face_id : Number, frontal:string, left:string, right:string){
+  return await axios.post('http://27.74.253.109:19692/checkin_api/register',{
+    merchant_id: '8',
+    group_id: '8',
+    person_id: face_id,
+    force:'0',
+    image_base64s: 
+    {
+      'frontal': frontal,
+      'left': left,
+      'right': right
     }
+  })
+}
 
-    performBatchUpdate(list);
-    
-    console.log("thuyyy_list: ",list)
-    console.log("thuyyy_failed_list: ",failed_list)
-
-    res.send({ success: true, failed_list: failed_list });
-    };
+async function registerNewPerson(fullName:string){
+  return await axios.post("http://27.74.253.109:19692/web_api/person", {
+    merchant_id: 8,
+    group_id: 8,
+    person_fullname: fullName,
+    });
 }
