@@ -13,12 +13,15 @@ const onCreateItems =
 
     const student = await database.table("students").where("id", input.payload.student).first();
 
-    const mailService = new context.services.MailService({ schema, knex: database });
-    const mailer: Transporter = mailService.mailer;
-    let mailReceiver = "19120390@student.hcmus.edu.vn";
+    let mailReceiver = "";
     if (student.parents_email) {
       mailReceiver = student.parents_email;
+    } else{
+      return input;
     }
+
+    const mailService = new context.services.MailService({ schema, knex: database });
+    const mailer: Transporter = mailService.mailer;
 
     const studentFullName = student.last_name + " " + student.first_name;
 
@@ -108,7 +111,7 @@ export default defineHook(({ action }, context) => {
   context.emitter.onAction("items.create", onCreateItems(context))
 });
 
-const handleDownloadAvatarWithFrame = async (des: string, frame: string): Promise<Buffer> => {
+const =handleDownloadAvatarWithFrame = async (des: string, frame: string): Promise<Buffer> => {
   const frameBuffer = await compositeImage(frame);
   const desBuffer = await compositeImage(des);
 
