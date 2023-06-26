@@ -46,7 +46,7 @@ export const handleUpsertCico =
       "checkin",
       "checkout",
       "absence_reason",
-      "absence_forewarned",
+      "absence",
     ].reduce((prev, value) => {
       prev.set(value, true);
       return prev;
@@ -294,4 +294,38 @@ async function registerNewPerson(fullName:string){
     group_id: 8,
     person_fullname: fullName,
     });
+}
+
+export const handleUpdateStudentClass = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+  console.log("thuyyy_body: ",body)
+
+  const studentIds = body.students.replace(/\[/g, "").replace(/\]/g, "").split(',');;
+  const classId=body.class;
+
+  console.log("thuyyy_studentIds: ",studentIds)
+  console.log("thuyyy_classId: ",classId)
+
+  database.transaction(trx => {
+    const queries =[];
+    for (let i in studentIds) {
+      const query = database('students_classes')
+      .insert({
+        class: classId,
+        student: studentIds[i],
+      })
+      .onConflict(["student", "class"])
+      .ignore()
+      .transacting(trx); 
+
+      queries.push(query);
+    }
+
+    Promise.all(queries)
+        .then(trx.commit)
+        .catch(trx.rollback); 
+  }); 
+
+  res.send({ success: true});
 }
