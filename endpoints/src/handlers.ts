@@ -32,20 +32,23 @@ export const handleUpsertCico =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
     const body = req.body;
 
-    let m = new Date(body.datetime);
+    let m = new Date(body.date);
     let month = String(m.getMonth() + 1).padStart(2, "0");
     let day = String(m.getDate()).padStart(2, "0");
     let dateString = "" + m.getUTCFullYear() + month + day;
     body.unique_date_student_id = `${body.student}_${dateString}`;
     let date = new Date(m.getUTCFullYear() + "-" + month + "-" + day);
     body.date = date.getTime();
-    body.datetime = m.getTime();
 
     let mergeFields = [
       "checkin",
       "checkout",
       "absence_reason",
       "absence",
+      "register_picker",
+      "picker_name",
+      "picker",
+      "picking_confirmed_by_parent"
     ].reduce((prev, value) => {
       prev.set(value, true);
       return prev;
