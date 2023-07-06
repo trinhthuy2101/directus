@@ -17,7 +17,7 @@ export const handleUpsertSetting =
         class: body.class || 0,
       })
       .onConflict(["key", "class"])
-      .merge(["value"])
+      .merge(["value","start_time","end_time"])
       .catch((err: Error) => err);
 
     if (data instanceof Error) {
@@ -583,3 +583,42 @@ export const handleUpdateStudentClass =
 
     res.send({ success: true });
   };
+
+export const genClassDailyReport=(ctx: EndpointExtennContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+  console.log("gen_class_daily_report_request_body: ", body);
+  
+  if (!body.class||!body.date){
+    res.status(400).send({error: "Bad Request"})
+  }
+  const class_id = body.class
+  const date =body.date.getTime()
+
+
+  const cicos = await database
+  .table("cico_photos")
+  .where("class_id", class_id)
+  .where("date", date)
+
+  let a : ClassDailyReport ={
+    totalAbsence:0,
+    withNotice:0,
+    withoutNotice:0,
+    absence_list:""
+  }
+
+  // for (let c of cicos){
+  //   if 
+  // }
+
+
+  res.send({ success: true });
+};
+
+interface ClassDailyReport{
+  totalAbsence : number,
+  withNotice : number,
+  withoutNotice : number,
+  absence_list: string,
+}
