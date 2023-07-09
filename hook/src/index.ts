@@ -5,70 +5,61 @@ import sharp from "sharp";
 import axios from "axios";
 
 const ASSET_URL = "http://3.0.100.91:8055/assets";
+const NOTI_MODE = "email" //"app_noti"
 
 const onCreateItems =
   (context: HookExtensionContext): ActionHandler =>
-  async (input, { database, schema }) => {
-    if (!["cico_photos", "students"].includes(input.collection)) return input;
+    async (input, { database, schema }) => {
+      if (!["cico_photos", "students"].includes(input.collection)) return input;
 
-    const student = await database.table("students").where("id", input.payload.student).first();
+      const student = await database.table("students").where("id", input.payload.student).first();
 
-    let mailReceiver = "";
-    if (student.parents_email) {
-      mailReceiver = student.parents_email;
-    } else{
-      return input;
-    }
+      const frameURL = await getFrameURL(student.current_class,database)
 
-    const mailService = new context.services.MailService({ schema, knex: database });
-    const mailer: Transporter = mailService.mailer;
+      if (input.payload.checkin) {
+        var checkinBuffer: Buffer;
 
-    const studentFullName = student.last_name + " " + student.first_name;
+        const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
 
-    const frameSettings = await database
-      .table("settings")
-      .where("class", student.current_class)
-      .where("key", "frame")
-      .first();
-
-    let frameURL = "";
-    let start = new Date(frameSettings.start_time);
-    let end = new Date(frameSettings.end_time);
-    if (
-      frameSettings &&
-      Number(frameSettings.value) > 0 &&
-      frameSettings.status === "active" &&
-      (!(start.getTime() === start.getTime()) || start <= new Date()) &&
-      (!(end.getTime() === end.getTime()) || end >= new Date())
-    ) {
-      const frame = await database.table("frames").where("id", frameSettings.value).first();
-      if (frame && frame.frame != "") {
-        frameURL = `${ASSET_URL}/${frame.frame}`;
+        if (frameURL != "") {
+          checkinBuffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
+        } else {
+          checkinBuffer = await compositeImage(checkinURL);
+        }
       }
-    }
 
-    switch (input.collection) {
-      case "cico_photos":
-        let buffer: Buffer;
+      if (input.payload.checkout) {
+        var checkoutBuffer: Buffer;
+
+        const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
+
+        if (frameURL != "") {
+          checkoutBuffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
+        } else {
+          checkoutBuffer = await compositeImage(checkinURL);
+        }
+      }
+
+      const studentFullName = student.last_name + " " + student.first_name;
+
+      if (NOTI_MODE == "email") {
+        if (!student.parents_email) {
+          return input
+        }
+
+        const mailService = new context.services.MailService({ schema, knex: database });
+        const mailer: Transporter = mailService.mailer;
 
         if (input.payload.checkin) {
-          const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
-
-          if (frameURL != "") {
-            buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
-          } else {
-            buffer = await compositeImage(checkinURL);
-          }
-
           await mailer.sendMail({
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
-            to: mailReceiver,
-            subject: "CHECKED IN: " + studentFullName + " - " + new Date(input.payload.datetime).toDateString(),
+            to: student.parents_email,
+            subject: "CHECKED IN: " + studentFullName + " - " + new Date(input.payload.date).toDateString(),
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
             attachments: [
               {
                 filename: "image.png",
-                content: buffer,
+                content: checkinBuffer,
                 cid: "student_checkin_id",
               },
             ],
@@ -77,41 +68,59 @@ const onCreateItems =
         }
 
         if (input.payload.checkout) {
-          const checkoutURL = `${ASSET_URL}/${input.payload.checkout}`;
-          if (frameURL != "") {
-            buffer = await handleDownloadAvatarWithFrame(checkoutURL, frameURL);
-          } else {
-            buffer = await compositeImage(checkoutURL);
-          }
-
           await mailer.sendMail({
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
-            to: mailReceiver,
+            to: student.parents_email,
             subject: "CHECKED OUT: " + studentFullName + " - " + new Date(input.payload.datetime).toDateString(),
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
             attachments: [
               {
                 filename: "image.png",
-                content: buffer,
+                content: checkoutBuffer,
                 cid: "student_checkout_id",
               },
             ],
           });
-          console.log("Email sent");
+          console.log("Checkout");
         }
 
-        break;
-    }
+      } else if (NOTI_MODE == "app_noti") {
 
-    return input;
-  };
+      }
+      return input;
+    };
 
 export default defineHook(({ action }, context) => {
   action("items.create", onCreateItems(context));
   context.emitter.onAction("items.create", onCreateItems(context))
 });
 
-const =handleDownloadAvatarWithFrame = async (des: string, frame: string): Promise<Buffer> => {
+async function getFrameURL(class_id: number,database:any) {
+  const frameSettings = await database
+    .table("settings")
+    .where("class", class_id)
+    .where("key", "frame")
+    .first();
+
+  let frameURL = "";
+  let start = new Date(frameSettings.start_time);
+  let end = new Date(frameSettings.end_time);
+  if (
+    frameSettings &&
+    Number(frameSettings.value) > 1 &&
+    frameSettings.status === "active" &&
+    (!(start.getTime() === start.getTime()) || start <= new Date()) &&
+    (!(end.getTime() === end.getTime()) || end >= new Date())
+  ) {
+    const frame = await database.table("frames").where("id", frameSettings.value).first();
+    if (frame && frame.frame != "") {
+      frameURL = `${ASSET_URL}/${frame.frame}`;
+    }
+  }
+  return frameURL
+};
+
+const handleDownloadAvatarWithFrame = async (des: string, frame: string): Promise<Buffer> => {
   const frameBuffer = await compositeImage(frame);
   const desBuffer = await compositeImage(des);
 
