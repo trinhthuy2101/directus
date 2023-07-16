@@ -33,14 +33,6 @@ export const handleUpsertCico =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
     const body = req.body;
 
-    let m = new Date(body.date);
-    let month = String(m.getMonth() + 1).padStart(2, "0");
-    let day = String(m.getDate()).padStart(2, "0");
-    let dateString = "" + m.getUTCFullYear() + month + day;
-    body.unique_date_student_id = `${body.student}_${dateString}`;
-    let date = new Date(m.getUTCFullYear() + "-" + month + "-" + day);
-    body.date = date.getTime();
-
     let mergeFields = [
       "checkin",
       "checkout",
@@ -64,7 +56,7 @@ export const handleUpsertCico =
     const data = await ctx.database
       .table("cico_photos")
       .insert(body)
-      .onConflict(["unique_date_student_id"])
+      .onConflict(["student","date"])
       .merge([...mergeFields.keys()])
       .catch((err: Error) => err);
 
@@ -595,13 +587,12 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
   }
   const class_id = body.class
   const date = new Date(body.date)
-  const date_unix = date.getTime()
 
   const cicos = await database
     .table("cico_photos")
-    .select("checkin", "checkout", "absence")
+    .select("checkin", "checkout", "absence","student_name")
     .where("class_id", class_id)
-    .where("date", date_unix)
+    .where("date", date)
 
   let a: ClassDailyReport = {
     totalAbsence: 0,
@@ -625,12 +616,11 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
 
   const report = {
     "class": class_id,
-    "date": date_unix,
+    "date": date,
     "total_of_absent_students": a.totalAbsence,
     "with_notice": a.withNotice,
     "without_notice": a.withoutNotice,
-    "absent_list": a.absence_list,
-    "date_created": (new Date()).getTime()
+    "absent_list": a.absence_list
   }
 
   await database
@@ -660,20 +650,19 @@ export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (re
 
   const school_id = body.school
   const date = new Date(body.date)
-  const date_unix = date.getTime()
 
   const cicos = await database
     .table("cico_photos")
     .select("checkin", "checkout", "absence")
     .where("school_id", school_id)
-    .where("date", date_unix)
+    .where("date", date)
 
   let totalAbsence = 0
   let withNotice = 0
   let withoutNotice = 0
 
   for (let c of cicos) {
-    if (!c.checkin) { }
+    if (!c.checkin&&!c.checkout) { }
     totalAbsence += 1
     if (c.absence = 1) {
       withNotice += 1
@@ -684,11 +673,10 @@ export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (re
 
   const report = {
     "school_id": school_id,
-    "date": date_unix,
+    "date": date,
     "total_of_absent_students": totalAbsence,
     "with_notice": withNotice,
-    "without_notice": withoutNotice,
-    "date_created": (new Date()).getTime()
+    "without_notice": withoutNotice
   }
 
   await database
@@ -700,59 +688,62 @@ export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (re
   res.send({ success: true, data: report });
 };
 
-// export const generateCicoRecords = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
-//   const { database } = ctx;
-//   const body = req.body;
-//   console.log("generate cico records body: ", body);
+export const generateCicoRecords = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+  console.log("generate cico records body: ", body);
 
-//   if (!body.school || !body.date) {
-//     res.status(400).send({ error: "Bad Request" })
-//   }
+  const schools = await database
+    .table("schools")
+    .select("id")
+    .where("status", "active")
 
-//   const class = await database
-//     .table("schools")
-//     .select("checkin", "checkout", "absence")
-//     .where("school_id", school_id)
-//     .where("date", date_unix)
+  const dateTime = new Date();
+  const month = String(dateTime.getMonth() + 1).padStart(2, "0");
+  const day = String(dateTime.getDate()).padStart(2, "0");
+  const date = new Date(dateTime.getUTCFullYear() + "-" + month + "-" + day);
 
-//   const school_id = body.school
-//   const date = new Date(body.date)
-//   const date_unix = date.getTime()
+  for (let s of schools) {
+    await addSchoolCicoRecords(ctx,s, date)
+  }
 
-//   const cicos = await database
-//     .table("cico_photos")
-//     .select("checkin", "checkout", "absence")
-//     .where("school_id", school_id)
-//     .where("date", date_unix)
+  res.send({ success: true });
+};
 
-//   let totalAbsence = 0
-//   let withNotice = 0
-//   let withoutNotice = 0
+async function addSchoolCicoRecords(ctx: EndpointExtensionContext,school_id: number, date: Date) {
+  const {database} =ctx
+  const students = await database
+    .table("students")
+    .select("id","class","last_name","first_name")
+    .where("status", "active")
 
-//   for (let c of cicos) {
-//     if (!c.checkin) { }
-//     totalAbsence += 1
-//     if (c.absence = 1) {
-//       withNotice += 1
-//     }
-//   }
+    await database.transaction(
+      (trx) => {
+        const queries = [];
+        for (const s of students) {
+          const payload={
+            "student":s.id,
+            "class":s.class,
+            "school":school_id,
+            "date":date,
+            "student_name":s.last_name+" "+s.first_name
+          }
+          
+          queries.push(
+            database.table("cico_photos")
+              .insert(payload)
+              .onConflict(["date","student"])
+              .merge("absence").transacting(trx)
+          );
+        }
+        
+        console.log("batch_insert_queries: ", queries);
+  
+        Promise.all(queries) // Once every query is written
+          .then(trx.commit) // We try to execute all of them
+          .catch(trx.rollback); // And rollback in case any of them goes wrong
+      },
+      { doNotRejectOnRollback: true }
+    );
 
-//   withoutNotice = totalAbsence - withNotice
-
-//   const report = {
-//     "school_id": school_id,
-//     "date": date_unix,
-//     "total_of_absent_students": totalAbsence,
-//     "with_notice": withNotice,
-//     "without_notice": withoutNotice,
-//     "date_created": (new Date()).getTime()
-//   }
-
-//   await database
-//     .table("school_daily_reports")
-//     .insert(report)
-
-//   console.log(`School's daily report generated for school id ${school_id}: `, report)
-
-//   res.send({ success: true, data: report });
-// };
+}
