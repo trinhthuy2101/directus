@@ -32,7 +32,7 @@ const onCreateItems =
         console.log("failed to get student from db")
         return input
       }
-      
+
       console.log("student: ", student)
       const studentFullName = student.last_name + " " + student.first_name;
 
@@ -41,30 +41,30 @@ const onCreateItems =
 
         if (input.payload.checkin) {
           message = {
-            to: student.expo_push_token,
-            sound: 'default',
-            title: 'Original Title',
-            body: {
+            'to': student.expo_push_token,
+            'sound': 'default',
+            'title': 'Original Title',
+            'body': 'checkin',
+            'data': {
               "student_id": input.payload.student,
               "date": input.payload.date,
               "type": "checkin",
               "message": input.payload.date + ": Xác nhận điểm danh vào lớp bé " + studentFullName,
             },
-            data: { someData: 'goes here' },
           };
         }
         else if (input.payload.checkout) {
           message = {
-            to: student.expo_push_token,
-            sound: 'default',
-            title: 'Original Title',
-            body: {
+            'to': student.expo_push_token,
+            'sound': 'default',
+            'title': 'Original Title',
+            'body': 'checkout',
+            'data': {
               "student_id": input.payload.student,
               "date": input.payload.date,
               "type": "checkout",
               "message": input.payload.date + ": Xác nhận điểm danh ra về bé " + studentFullName
             },
-            data: { someData: 'goes here' },
           };
         }
 
@@ -89,7 +89,7 @@ const onCreateItems =
           mailPayload = {
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
             to: student.parent_email,
-            subject: new Date(input.payload.date).toDateString()+ ": Xác nhận điểm danh vào lớp bé" + studentFullName,
+            subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh vào lớp bé" + studentFullName,
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
             attachments: [
               {
@@ -107,7 +107,7 @@ const onCreateItems =
           mailPayload = {
             from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
             to: student.parent_email,
-            subject: new Date(input.payload.date).toDateString()+ ": Xác nhận điểm danh ra về bé" + studentFullName,
+            subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh ra về bé" + studentFullName,
             html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
             attachments: [
               {
