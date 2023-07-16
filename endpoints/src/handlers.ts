@@ -56,7 +56,7 @@ export const handleUpsertCico =
     const data = await ctx.database
       .table("cico_photos")
       .insert(body)
-      .onConflict(["student","date"])
+      .onConflict(["student", "date"])
       .merge([...mergeFields.keys()])
       .catch((err: Error) => err);
 
@@ -590,7 +590,7 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
 
   const cicos = await database
     .table("cico_photos")
-    .select("checkin", "checkout", "absence","student_name")
+    .select("checkin", "checkout", "absence", "student_name")
     .where("class_id", class_id)
     .where("date", date)
 
@@ -602,13 +602,14 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
   }
 
   for (let c of cicos) {
-    if (!c.checkin) { }
-    a.totalAbsence += 1
-    if (c.absence = 1) {
-      a.withNotice += 1
-      a.absence_list += c.student_name + " - Có phép \n"
-    } else {
-      a.absence_list += c.student_name + "\n"
+    if (!c.checkin&&!c.checkout) {
+      a.totalAbsence += 1
+      if (c.absence == 1) {
+        a.withNotice += 1
+        a.absence_list += c.student_name + " - Có phép \n"
+      } else {
+        a.absence_list += c.student_name + "\n"
+      }
     }
   }
 
@@ -662,17 +663,18 @@ export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (re
   let withoutNotice = 0
 
   for (let c of cicos) {
-    if (!c.checkin&&!c.checkout) { }
-    totalAbsence += 1
-    if (c.absence = 1) {
-      withNotice += 1
+    if (!c.checkin && !c.checkout) {
+      totalAbsence += 1
+      if (c.absence == 1) {
+        withNotice += 1
+      }
     }
   }
 
   withoutNotice = totalAbsence - withNotice
 
   const report = {
-    "school_id": school_id,
+    "school": school_id,
     "date": date,
     "total_of_absent_students": totalAbsence,
     "with_notice": withNotice,
@@ -704,46 +706,46 @@ export const generateCicoRecords = (ctx: EndpointExtensionContext) => async (req
   const date = new Date(dateTime.getUTCFullYear() + "-" + month + "-" + day);
 
   for (let s of schools) {
-    await addSchoolCicoRecords(ctx,s, date)
+    await addSchoolCicoRecords(ctx, s, date)
   }
 
   res.send({ success: true });
 };
 
-async function addSchoolCicoRecords(ctx: EndpointExtensionContext,school_id: number, date: Date) {
-  const {database} =ctx
+async function addSchoolCicoRecords(ctx: EndpointExtensionContext, school_id: number, date: Date) {
+  const { database } = ctx
   const students = await database
     .table("students")
-    .select("id","class","last_name","first_name")
+    .select("id", "class", "last_name", "first_name")
     .where("status", "active")
 
-    await database.transaction(
-      (trx) => {
-        const queries = [];
-        for (const s of students) {
-          const payload={
-            "student":s.id,
-            "class":s.class,
-            "school":school_id,
-            "date":date,
-            "student_name":s.last_name+" "+s.first_name
-          }
-          
-          queries.push(
-            database.table("cico_photos")
-              .insert(payload)
-              .onConflict(["date","student"])
-              .merge("absence").transacting(trx)
-          );
+  await database.transaction(
+    (trx) => {
+      const queries = [];
+      for (const s of students) {
+        const payload = {
+          "student": s.id,
+          "class": s.class,
+          "school": school_id,
+          "date": date,
+          "student_name": s.last_name + " " + s.first_name
         }
-        
-        console.log("batch_insert_queries: ", queries);
-  
-        Promise.all(queries) // Once every query is written
-          .then(trx.commit) // We try to execute all of them
-          .catch(trx.rollback); // And rollback in case any of them goes wrong
-      },
-      { doNotRejectOnRollback: true }
-    );
+
+        queries.push(
+          database.table("cico_photos")
+            .insert(payload)
+            .onConflict(["date", "student"])
+            .merge("absence").transacting(trx)
+        );
+      }
+
+      console.log("batch_insert_queries: ", queries);
+
+      Promise.all(queries) // Once every query is written
+        .then(trx.commit) // We try to execute all of them
+        .catch(trx.rollback); // And rollback in case any of them goes wrong
+    },
+    { doNotRejectOnRollback: true }
+  );
 
 }
