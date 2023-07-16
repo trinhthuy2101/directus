@@ -1,6 +1,7 @@
 import { EndpointExtensionContext } from "@directus/shared/types";
 import e, { Response } from "express";
 import axios from "axios";
+import { access } from "fs";
 const ASSET_URL = "http://3.0.100.91:8055/assets";
 
 export const handleUpsertSetting =
@@ -17,7 +18,7 @@ export const handleUpsertSetting =
         class: body.class || 0,
       })
       .onConflict(["key", "class"])
-      .merge(["value","start_time","end_time"])
+      .merge(["value", "start_time", "end_time"])
       .catch((err: Error) => err);
 
     if (data instanceof Error) {
@@ -156,12 +157,12 @@ export const updateClassFaceId =
               }
               failed_list.push(
                 ++count +
-                  ". " +
-                  s.last_name +
-                  " " +
-                  s.first_name +
-                  " : " +
-                  status
+                ". " +
+                s.last_name +
+                " " +
+                s.first_name +
+                " : " +
+                status
               );
             }
           } else {
@@ -200,23 +201,23 @@ export const updateClassFaceId =
               }
               failed_list.push(
                 ++count +
-                  ". " +
-                  s.last_name +
-                  " " +
-                  s.first_name +
-                  ": " +
-                  status
+                ". " +
+                s.last_name +
+                " " +
+                s.first_name +
+                ": " +
+                status
               );
             }
           }
         } else {
           failed_list.push(
             ++count +
-              ". " +
-              s.last_name +
-              " " +
-              s.first_name +
-              " : Student has not provided face's images"
+            ". " +
+            s.last_name +
+            " " +
+            s.first_name +
+            " : Student has not provided face's images"
           );
         }
       }
@@ -275,22 +276,22 @@ export const updateClassFaceId =
               }
               failed_list.push(
                 ++count +
-                  ". " +
-                  s.last_name +
-                  " " +
-                  s.first_name +
-                  ": " +
-                  status
+                ". " +
+                s.last_name +
+                " " +
+                s.first_name +
+                ": " +
+                status
               );
             }
           } else {
             failed_list.push(
               ++count +
-                ". " +
-                s.last_name +
-                " " +
-                s.first_name +
-                " : Student has not provided face's images"
+              ". " +
+              s.last_name +
+              " " +
+              s.first_name +
+              " : Student has not provided face's images"
             );
           }
         }
@@ -426,11 +427,11 @@ export const updateStudentsFaceId =
       } else {
         failed_list.push(
           ++count +
-            ". " +
-            s.last_name +
-            " " +
-            s.first_name +
-            " : Student has not provided face's images"
+          ". " +
+          s.last_name +
+          " " +
+          s.first_name +
+          " : Student has not provided face's images"
         );
       }
     }
@@ -485,17 +486,17 @@ async function performBatchUpdate(ctx: EndpointExtensionContext, students) {
     (trx) => {
       const queries = [];
       for (const s of students) {
-        let flag=0
+        let flag = 0
         for (const e of existingFaceIds1) {
           if (e.face_id == s.face_id) {
             if (e.id != s.id) {
               failedItems.push(s);
             }
-            flag=1
+            flag = 1
             break;
           }
         }
-        if(flag==1) continue;
+        if (flag == 1) continue;
 
         queries.push(
           database("students")
@@ -584,41 +585,174 @@ export const handleUpdateStudentClass =
     res.send({ success: true });
   };
 
-export const genClassDailyReport=(ctx: EndpointExtennContext) => async (req: any, res: Response) => {
+export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
   const { database } = ctx;
   const body = req.body;
   console.log("gen_class_daily_report_request_body: ", body);
-  
-  if (!body.class||!body.date){
-    res.status(400).send({error: "Bad Request"})
+
+  if (!body.class || !body.date) {
+    res.status(400).send({ error: "Bad Request" })
   }
   const class_id = body.class
-  const date =body.date.getTime()
-
+  const date = new Date(body.date)
+  const date_unix = date.getTime()
 
   const cicos = await database
-  .table("cico_photos")
-  .where("class_id", class_id)
-  .where("date", date)
+    .table("cico_photos")
+    .select("checkin", "checkout", "absence")
+    .where("class_id", class_id)
+    .where("date", date_unix)
 
-  let a : ClassDailyReport ={
-    totalAbsence:0,
-    withNotice:0,
-    withoutNotice:0,
-    absence_list:""
+  let a: ClassDailyReport = {
+    totalAbsence: 0,
+    withNotice: 0,
+    withoutNotice: 0,
+    absence_list: ""
   }
 
-  // for (let c of cicos){
-  //   if 
-  // }
+  for (let c of cicos) {
+    if (!c.checkin) { }
+    a.totalAbsence += 1
+    if (c.absence = 1) {
+      a.withNotice += 1
+      a.absence_list += c.student_name + " - Có phép \n"
+    } else {
+      a.absence_list += c.student_name + "\n"
+    }
+  }
 
+  a.withoutNotice = a.totalAbsence - a.withNotice
 
-  res.send({ success: true });
+  const report = {
+    "class": class_id,
+    "date": date_unix,
+    "total_of_absent_students": a.totalAbsence,
+    "with_notice": a.withNotice,
+    "without_notice": a.withoutNotice,
+    "absent_list": a.absence_list,
+    "date_created": (new Date()).getTime()
+  }
+
+  await database
+    .table("class_daily_reports")
+    .insert(report)
+
+  console.log(`Class' daily report generated for class id ${class_id}: `, report)
+
+  res.send({ success: true, data: report });
 };
 
-interface ClassDailyReport{
-  totalAbsence : number,
-  withNotice : number,
-  withoutNotice : number,
+interface ClassDailyReport {
+  totalAbsence: number,
+  withNotice: number,
+  withoutNotice: number,
   absence_list: string,
 }
+
+export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+  console.log("gen_school_daily_report_request_body: ", body);
+
+  if (!body.school || !body.date) {
+    res.status(400).send({ error: "Bad Request" })
+  }
+
+  const school_id = body.school
+  const date = new Date(body.date)
+  const date_unix = date.getTime()
+
+  const cicos = await database
+    .table("cico_photos")
+    .select("checkin", "checkout", "absence")
+    .where("school_id", school_id)
+    .where("date", date_unix)
+
+  let totalAbsence = 0
+  let withNotice = 0
+  let withoutNotice = 0
+
+  for (let c of cicos) {
+    if (!c.checkin) { }
+    totalAbsence += 1
+    if (c.absence = 1) {
+      withNotice += 1
+    }
+  }
+
+  withoutNotice = totalAbsence - withNotice
+
+  const report = {
+    "school_id": school_id,
+    "date": date_unix,
+    "total_of_absent_students": totalAbsence,
+    "with_notice": withNotice,
+    "without_notice": withoutNotice,
+    "date_created": (new Date()).getTime()
+  }
+
+  await database
+    .table("school_daily_reports")
+    .insert(report)
+
+  console.log(`School's daily report generated for school id ${school_id}: `, report)
+
+  res.send({ success: true, data: report });
+};
+
+// export const generateCicoRecords = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+//   const { database } = ctx;
+//   const body = req.body;
+//   console.log("generate cico records body: ", body);
+
+//   if (!body.school || !body.date) {
+//     res.status(400).send({ error: "Bad Request" })
+//   }
+
+//   const class = await database
+//     .table("schools")
+//     .select("checkin", "checkout", "absence")
+//     .where("school_id", school_id)
+//     .where("date", date_unix)
+
+//   const school_id = body.school
+//   const date = new Date(body.date)
+//   const date_unix = date.getTime()
+
+//   const cicos = await database
+//     .table("cico_photos")
+//     .select("checkin", "checkout", "absence")
+//     .where("school_id", school_id)
+//     .where("date", date_unix)
+
+//   let totalAbsence = 0
+//   let withNotice = 0
+//   let withoutNotice = 0
+
+//   for (let c of cicos) {
+//     if (!c.checkin) { }
+//     totalAbsence += 1
+//     if (c.absence = 1) {
+//       withNotice += 1
+//     }
+//   }
+
+//   withoutNotice = totalAbsence - withNotice
+
+//   const report = {
+//     "school_id": school_id,
+//     "date": date_unix,
+//     "total_of_absent_students": totalAbsence,
+//     "with_notice": withNotice,
+//     "without_notice": withoutNotice,
+//     "date_created": (new Date()).getTime()
+//   }
+
+//   await database
+//     .table("school_daily_reports")
+//     .insert(report)
+
+//   console.log(`School's daily report generated for school id ${school_id}: `, report)
+
+//   res.send({ success: true, data: report });
+// };
