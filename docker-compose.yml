@@ -16,11 +16,11 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - ./database:/directus/database
+      - ./database:/var/lib/postgresql/data
   directus:
-    image: directus/directus:9.24
+    image: directus/directus:latest
     ports:
-      - 80:8055
+      - 8055:8055
     volumes:
       - ./uploads:/directus/uploads
       - ./endpoints/dist:/directus/extensions/endpoints/kinder-checkin-endpoints
