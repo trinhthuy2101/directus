@@ -602,7 +602,7 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
   }
 
   for (let c of cicos) {
-    if (!c.checkin&&!c.checkout) {
+    if (!c.checkin && !c.checkout) {
       a.totalAbsence += 1
       if (c.absence == 1) {
         a.withNotice += 1
@@ -747,5 +747,59 @@ async function addSchoolCicoRecords(ctx: EndpointExtensionContext, school_id: nu
     },
     { doNotRejectOnRollback: true }
   );
-
 }
+
+export const generateClassReports = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+  console.log("generate class reports body: ", body);
+
+  if (!body.class || !body.from || !body.to) {
+    res.status(400).send({ success: false, error: "Invalid Request" });
+  }
+
+  const students = await database
+    .table("cico_photos")
+    .select("student as id", "student_name as fullname")
+    .where("class_id", body.class)
+    .where("date", ">=", body.from)
+    .where("date", "<=", body.to)
+    .where("checkin", null).where("checkout", null)
+    .count({ count: '* as total_absent_days' }).groupBy("student", "student_name")
+  
+    console.log("gen class report students with total absent days: ",students)
+
+  const with_notice = await database
+    .table("cico_photos")
+    .select("student as id")
+    .where("class_id", body.class)
+    .where("date", ">=", body.from)
+    .where("date", "<=", body.to)
+    .where("checkin", null).where("checkout", null).where("absence", '1')
+    .count({ count: '*' }).groupBy("student")
+
+    console.log("gen class report students with noticed absent days: ",with_notice)
+
+  const with_notice_map = new Map();
+  with_notice.forEach(item => {
+    with_notice_map.set(item.id, item.count);
+  });
+
+  for (let s of students) {
+    if (with_notice_map.has(s.id)) {
+      s.with_notice = with_notice_map.get(s.id)
+    }
+  }
+
+  console.log("generate class reports students with total absent days and days with notice: ", students)
+
+  await database.table("class_reports")
+  .insert({
+    "class":body.class,
+    "from":body.from,
+    "to":body.to,
+    "sumary":JSON.stringify(students)
+  })
+
+  res.send({ success: true });
+};

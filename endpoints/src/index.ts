@@ -1,5 +1,5 @@
 import { defineEndpoint } from "@directus/extensions-sdk";
-import { handleUpsertSetting, handleUpsertCico, updateClassFaceId, updateStudentsFaceId,handleUpdateStudentClass,genClassDailyReport,genSchoolDailyReport,generateCicoRecords} from "./handlers";
+import { handleUpsertSetting, handleUpsertCico, updateClassFaceId, updateStudentsFaceId,handleUpdateStudentClass,generateClassReports,genClassDailyReport,genSchoolDailyReport,generateCicoRecords} from "./handlers";
 
 export default defineEndpoint({
   id: "exts",
@@ -12,5 +12,6 @@ export default defineEndpoint({
     router.post("/gen_class_daily_report",genClassDailyReport(ctx))
     router.post("/gen_school_daily_report",genSchoolDailyReport(ctx))
     router.post("/gen_cico_records_automatically",generateCicoRecords(ctx))
+    router.post("/generate_class_reports",generateClassReports(ctx))
   },
 });
