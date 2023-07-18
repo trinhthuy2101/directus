@@ -706,7 +706,7 @@ export const generateCicoRecords = (ctx: EndpointExtensionContext) => async (req
   const date = new Date(dateTime.getUTCFullYear() + "-" + month + "-" + day);
 
   for (let s of schools) {
-    await addSchoolCicoRecords(ctx, s, date)
+    await addSchoolCicoRecords(ctx, s.id, date)
   }
 
   res.send({ success: true });
@@ -716,7 +716,8 @@ async function addSchoolCicoRecords(ctx: EndpointExtensionContext, school_id: nu
   const { database } = ctx
   const students = await database
     .table("students")
-    .select("id", "class", "last_name", "first_name")
+    .select("id", "current_class", "last_name", "first_name")
+    .where("school",school_id)
     .where("status", "active")
 
   await database.transaction(
@@ -725,8 +726,8 @@ async function addSchoolCicoRecords(ctx: EndpointExtensionContext, school_id: nu
       for (const s of students) {
         const payload = {
           "student": s.id,
-          "class": s.class,
-          "school": school_id,
+          "class_id": s.current_class,
+          "school_id": school_id,
           "date": date,
           "student_name": s.last_name + " " + s.first_name
         }
