@@ -766,7 +766,7 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
     .where("date", ">=", body.from)
     .where("date", "<=", body.to)
     .where("checkin", null).where("checkout", null)
-    .count({ count: '* as total_absent_days' }).groupBy("student", "student_name")
+    .count({ 'total absent days': '*' }).groupBy("student", "student_name")
   
     console.log("gen class report students with total absent days: ",students)
 
@@ -791,8 +791,12 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
       s.with_notice = with_notice_map.get(s.id)
     }
   }
+  
+  const sumary =JSON.stringify(students)
 
-  console.log("generate class reports students with total absent days and days with notice: ", students)
+
+  console.log("generate class reports students with total absent days and days with notice: ", )
+
 
   await database.table("class_reports")
   .insert({

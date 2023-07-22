@@ -13,31 +13,38 @@ AddElementTag("thirdparty", $bgColor="#888888")
 
 HIDE_STEREOTYPE()
 
-Person(teacher, "Teacher", "People who use checkin app", $sprite="users")
-Person(admin, "Teacher/Admin", "People who use checkin web", $sprite="users")
+Person(teacher, "Teachers", "People who use mobile app", $sprite="users")
+Person(parent, "Parents", "People who use mobile app", $sprite="users")
+Person(admin, "Teachers/System Admin", "People who use checkin web", $sprite="users")
 
 Container(app, "Mobile App", "React Native", $sprite="mobile_alt")
 Container(web, "Directus Admin", "Javascript, VueJS", $sprite="node_js")
+
+
+Container(ses, "AWS SES", "Amazon Simple Email Service", $sprite="aws", $tags="thirdparty")
 
 System_Boundary(ec2,"AWS EC2","Amazon Elastic Compute Cloud"){
   Container(direct, "Directus Backend", "Javascript, NodeJS 18", $sprite="node_js")
   ContainerDb(db, "Database", "Postgres", $sprite="database")
 }
 
-Container(ses, "AWS SES", "Amazon Simple Email Service", $sprite="aws", $tags="thirdparty")
+Container(expo_noti, "EXPO's Push API", "Expo's Push Notification Service", $sprite="server", $tags="thirdparty")
 
 Container(payoo, "PAYOO", "Face Recognition Service", $sprite="server", $tags="thirdparty")
 
 Rel(teacher, app, "Use", "")
+Rel(parent, app, "Use", "")
 Rel(admin, web, "Use", "")
 
 Rel(app, direct, "Request", "http")
 Rel(web, direct, "Request", "http")
 Rel(app, payoo, "Request", "https")
 
-
+Rel(direct, expo_noti, "Send Notifications", "https")
 Rel(direct, db, "Read/Write", "TCP")
 Rel(direct, ses, "Send email", "https")
+
+
 
 ' Rel_R(api, db, "Reads/Writes")
 
