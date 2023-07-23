@@ -4,7 +4,7 @@ import axios from "axios";
 import { access } from "fs";
 const ASSET_URL = "http://3.0.100.91:8055/assets";
 
-export const handleUpsertSetting =
+export const handleUpsertFrameSettings =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
     const { ForbiddenException } = ctx.exceptions;
 
@@ -29,7 +29,7 @@ export const handleUpsertSetting =
     res.send({ success: true });
   };
 
-export const handleUpsertCico =
+export const handleUpsertCicoPhotos =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
     const body = req.body;
 
@@ -53,16 +53,16 @@ export const handleUpsertCico =
       }
     }
 
-    const data = await ctx.database
+    const result = await ctx.database
       .table("cico_photos")
       .insert(body)
       .onConflict(["student", "date"])
       .merge([...mergeFields.keys()])
       .catch((err: Error) => err);
 
-    if (data instanceof Error) {
-      console.log("failed to upsert cico_photos", data);
-      res.status(500).send(data);
+    if (result instanceof Error) {
+      console.log("failed to upsert cico_photos", result);
+      res.status(500).send(result);
       return;
     }
 
@@ -78,15 +78,16 @@ export const handleUpsertCico =
     res.send({ success: true });
   };
 
-// log001
-export const updateClassFaceId =
-  (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
-    const { database } = ctx;
-    const body = req.body;
+export const UpdateFaceIdForAClass = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
 
-    console.log("log001_request_body: ", body);
+  console.log("info - update face id for a class request body", body);
 
-    const students = await database
+  let students
+  if (body.update_mode == "1") {
+    //update all students
+    students = await database
       .select(
         "id",
         "last_name",
@@ -98,239 +99,10 @@ export const updateClassFaceId =
       )
       .table("students")
       .where("current_class", body.id);
-
-    console.log("log001_db_query: ", students);
-
-    let list = [];
-    let failed_list = [];
-
-    if (body.update_mode == "1") {
-      let count = 0;
-      for (let s of students) {
-        if (s.frontal_face) {
-          const frontal = (
-            await compositeImage(`${ASSET_URL}/${s.frontal_face}`)
-          ).toString("base64");
-          let left = frontal;
-          if (s.left_side_face) {
-            left = (
-              await compositeImage(`${ASSET_URL}/${s.left_side_face}`)
-            ).toString("base64");
-          }
-          let right = frontal;
-          if (s.right_side_face) {
-            right = (
-              await compositeImage(`${ASSET_URL}/${s.right_side_face}`)
-            ).toString("base64");
-          }
-
-          if (s.face_id) {
-            const newFaceResult = await registerNewFace(
-              s.face_id,
-              frontal,
-              left,
-              right
-            );
-
-            console.log(
-              "log001_new_face_result_",
-              s.id,
-              " :",
-              newFaceResult.data
-            );
-
-            if (
-              newFaceResult.data.code != "1000" &&
-              newFaceResult.data.code != "709"
-            ) {
-              let status = newFaceResult.data.status;
-              if (newFaceResult.data.code == "1001") {
-                status = "Poor image quality";
-              }
-              failed_list.push(
-                ++count +
-                ". " +
-                s.last_name +
-                " " +
-                s.first_name +
-                " : " +
-                status
-              );
-            }
-          } else {
-            const newPersonResult = await registerNewPerson(
-              s.last_name + " " + s.first_name
-            );
-            console.log(
-              "log001_new_person_result_",
-              s.id,
-              " :",
-              newPersonResult.data
-            );
-
-            const newFaceResult = await registerNewFace(
-              newPersonResult.data.person_id,
-              frontal,
-              left,
-              right
-            );
-            console.log(
-              "log001_new_face_result_",
-              s.id,
-              " :",
-              newFaceResult.data
-            );
-
-            if (
-              newFaceResult.data.code == "1000" ||
-              newFaceResult.data.code == "709"
-            ) {
-              list.push({ id: s.id, face_id: newFaceResult.data.person_id });
-            } else {
-              let status = newFaceResult.data.status;
-              if (newFaceResult.data.code == "1001") {
-                status = "Poor image quality";
-              }
-              failed_list.push(
-                ++count +
-                ". " +
-                s.last_name +
-                " " +
-                s.first_name +
-                ": " +
-                status
-              );
-            }
-          }
-        } else {
-          failed_list.push(
-            ++count +
-            ". " +
-            s.last_name +
-            " " +
-            s.first_name +
-            " : Student has not provided face's images"
-          );
-        }
-      }
-    } else {
-      let count = 0;
-      for (let s of students) {
-        if (s.face_id == null) {
-          if (s.frontal_face) {
-            const frontal = (
-              await compositeImage(`${ASSET_URL}/${s.frontal_face}`)
-            ).toString("base64");
-            let left = frontal;
-            if (s.left_side_face) {
-              left = (
-                await compositeImage(`${ASSET_URL}/${s.left_side_face}`)
-              ).toString("base64");
-            }
-            let right = frontal;
-            if (s.right_side_face) {
-              right = (
-                await compositeImage(`${ASSET_URL}/${s.right_side_face}`)
-              ).toString("base64");
-            }
-
-            const newPersonResult = await registerNewPerson(
-              s.last_name + " " + s.first_name
-            );
-            console.log(
-              "log001_new_person_result_",
-              s.id,
-              " :",
-              newPersonResult.data
-            );
-            const newFaceResult = await registerNewFace(
-              newPersonResult.data.person_id,
-              frontal,
-              left,
-              right
-            );
-            console.log(
-              "log001_new_face_result_",
-              s.id,
-              " :",
-              newFaceResult.data
-            );
-
-            if (
-              newFaceResult.data.code == "1000" ||
-              newFaceResult.data.code == "709"
-            ) {
-              list.push({ id: s.id, face_id: newFaceResult.data.person_id });
-            } else {
-              let status = newFaceResult.data.status;
-              if (newFaceResult.data.code == "1001") {
-                status = "Poor image quality";
-              }
-              failed_list.push(
-                ++count +
-                ". " +
-                s.last_name +
-                " " +
-                s.first_name +
-                ": " +
-                status
-              );
-            }
-          } else {
-            failed_list.push(
-              ++count +
-              ". " +
-              s.last_name +
-              " " +
-              s.first_name +
-              " : Student has not provided face's images"
-            );
-          }
-        }
-      }
-    }
-
-    console.log("log001_list :", list);
-    console.log("log001_failed_list :", failed_list);
-
-    if (list.length > 0) {
-      const result = await performBatchUpdate(ctx, list);
-      if (
-        result &&
-        Array.isArray(result.failedItems) &&
-        result.failedItems.length > 0
-      ) {
-        console.log(
-          "Faces are registered for other student: ",
-          result.failedItems
-        );
-        // failed_list = [...failed_list, ...result.failedItems];
-      }
-    }
-
-    if (failed_list.length > 0) {
-      res
-        .status(500)
-        .send({ success: true, failed_list: failed_list.join("\n\n") });
-    } else {
-      res.send({ success: true });
-    }
-  };
-
-// log002
-export const updateStudentsFaceId =
-  (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
-    const { database } = ctx;
-
-    console.log("log002_request_body: ", req.body);
-
-    const studentIds = req.body.students;
-    const studentIds1 = studentIds
-      .replace(/\[/g, "")
-      .replace(/\]/g, "")
-      .split(",");
-
-    const students = await database
+  }
+  else {
+    //update students without face id
+    students = await database
       .select(
         "id",
         "last_name",
@@ -340,125 +112,243 @@ export const updateStudentsFaceId =
         "left_side_face",
         "right_side_face"
       )
-      .from("students")
-      .whereIn("id", studentIds1);
+      .table("students")
+      .where("current_class", body.id)
+      .where("face_id", null);
+  }
 
-    console.log("log002_db_query: ", students);
+  console.log('info - get student from db for face id updating: ', students)
 
-    let list = [];
-    let failed_list = [];
-    let count = 0;
+  let list = [];
+  let failed_list = [];
+  let count = 0;
 
-    for (let s of students) {
-      if (s.frontal_face) {
-        const frontal = (
-          await compositeImage(`${ASSET_URL}/${s.frontal_face}`)
-        ).toString("base64");
-        let left = frontal;
-        if (s.left_side_face) {
-          left = (
-            await compositeImage(`${ASSET_URL}/${s.left_side_face}`)
-          ).toString("base64");
-        }
-        let right = frontal;
-        if (s.right_side_face) {
-          right = (
-            await compositeImage(`${ASSET_URL}/${s.right_side_face}`)
-          ).toString("base64");
-        }
-
-        if (s.face_id) {
-          const newFaceResult = await registerNewFace(
-            s.face_id,
-            frontal,
-            left,
-            right
-          );
-          console.log("log002_new_face_", s.id, " :", newFaceResult.data);
-
-          if (
-            newFaceResult.data.code != "1000" &&
-            newFaceResult.data.code != "709"
-          ) {
-            let status = newFaceResult.data.status;
-            if (newFaceResult.data.code == "1001") {
-              status = "Poor image quality";
-            }
-            failed_list.push(
-              ++count + ". " + s.last_name + " " + s.first_name + " : " + status
-            );
-          }
-        } else {
-          const newPersonResult = await registerNewPerson(
-            s.last_name + " " + s.first_name
-          );
-          console.log("log002_new_person_", s.id, " :", newPersonResult.data);
-          const newFaceResult = await registerNewFace(
-            newPersonResult.data.person_id,
-            frontal,
-            left,
-            right
-          );
-          console.log("log002_new_face_", s.id, " :", newFaceResult.data);
-
-          if (
-            newFaceResult.data.code == "1000" ||
-            newFaceResult.data.code == "709"
-          ) {
-            list.push({ id: s.id, face_id: newFaceResult.data.person_id });
-          } else {
-            let status = newFaceResult.data.status;
-            if (newFaceResult.data.code == "1001") {
-              status = "Poor image quality";
-            }
-            failed_list.push(
-              ++count + ". " + s.last_name + " " + s.first_name + ": " + status
-            );
-          }
-        }
-      } else {
-        failed_list.push(
-          ++count +
-          ". " +
-          s.last_name +
-          " " +
-          s.first_name +
-          " : Student has not provided face's images"
-        );
-      }
+  for (let s of students) {
+    if (!s.frontal_face) {
+      failed_list.push(`${++count}. ${s.last_name} ${s.first_name} - Student has not provided face's images`);
     }
+    const faceImages = await compositeFaceImages(s.frontal_face, s.left_side_face, s.right_side_face)
 
-    console.log("log002_list: ", list);
-    console.log("log002_failed_list: ", failed_list);
+    if (s.face_id) {
+      const newFaceResult = await registerNewFace(
+        s.face_id,
+        faceImages.front,
+        faceImages.left ? faceImages.left : faceImages.front,
+        faceImages.right ? faceImages.right : faceImages.front
+      );
 
-    if (list.length > 0) {
-      let result = await performBatchUpdate(ctx, list);
+      console.log(`info - register new face result for student id ${s.id}: `, newFaceResult.data);
+
       if (
-        result &&
-        Array.isArray(result.failedItems) &&
-        result.failedItems.length > 0
+        newFaceResult.data.code == "1000" ||
+        newFaceResult.data.code == "709"
       ) {
-        console.log(
-          "Faces are registered for other student: ",
-          result.failedItems
-        );
-        // failed_list = [...failed_list, ...result.failedItems];
+        list.push({ id: s.id, face_id: newFaceResult.data.person_id });
+        continue;
       }
+
+      let status = newFaceResult.data.status;
+      if (newFaceResult.data.code == "1001") {
+        status = "Poor image quality";
+      }
+      failed_list.push(`${++count}. ${s.last_name} ${s.first_name}: ${status}`
+      );
+
+      continue;
     }
 
-    if (failed_list.length > 0) {
-      res
-        .status(500)
-        .send({ success: true, failed_list: failed_list.join("\n\n") });
-    } else {
-      res.send({ success: true });
-    }
-  };
+    const newPersonResult = await registerNewPerson(`${s.last_name} ${s.first_name}`);
 
-async function compositeImage(inputUrl: string): Promise<Buffer> {
-  return (await axios({ url: inputUrl, responseType: "arraybuffer" }))
-    .data as Buffer;
+    console.log(`info - register new person result for student id ${s.id}: `, newPersonResult.data);
+
+    const newFaceResult = await registerNewFace(
+      newPersonResult.data.person_id,
+      faceImages.front,
+      faceImages.left ? faceImages.left : faceImages.front,
+      faceImages.right ? faceImages.right : faceImages.front
+    );
+
+    console.log(`info - register new face result for student id ${s.id}: `, newFaceResult.data);
+
+    if (
+      newFaceResult.data.code == "1000" ||
+      newFaceResult.data.code == "709"
+    ) {
+      list.push({ id: s.id, face_id: newFaceResult.data.person_id });
+      continue;
+    }
+
+    let status = newFaceResult.data.status;
+    if (newFaceResult.data.code == "1001") {
+      status = "Poor image quality";
+    }
+    failed_list.push(`${++count}. ${s.last_name} ${s.first_name}: ${status}`
+    );
+
+    continue;
+  }
+
+  if (list.length > 0) {
+    const result = await performBatchUpdate(ctx, list);
+    if (
+      result &&
+      Array.isArray(result.failedItems) &&
+      result.failedItems.length > 0
+    ) {
+      console.log(
+        "Faces are registered for other student: ",
+        result.failedItems
+      );
+    }
+  }
+
+  if (failed_list.length > 0) {
+    res
+      .status(500)
+      .send({ success: true, failed_list: failed_list.join("\n\n") });
+  } else {
+    res.send({ success: true });
+  }
+};
+
+export const updateFaceIdForChosenStudents = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+
+  console.log("info - update face id for a class request body", body);
+
+  const studentIds = req.body.students;
+  const studentIds1 = studentIds
+    .replace(/\[/g, "")
+    .replace(/\]/g, "")
+    .split(",");
+
+  const students = await database
+    .select(
+      "id",
+      "last_name",
+      "first_name",
+      "face_id",
+      "frontal_face",
+      "left_side_face",
+      "right_side_face"
+    )
+    .from("students")
+    .whereIn("id", studentIds1);
+  console.log('info - get student from db for face id updating: ', students)
+
+  let list = [];
+  let failed_list = [];
+  let count = 0;
+
+  for (let s of students) {
+    if (!s.frontal_face) {
+      failed_list.push(`${++count}. ${s.last_name} ${s.first_name} - Student has not provided face's images`);
+    }
+    const faceImages = await compositeFaceImages(s.frontal_face, s.left_side_face, s.right_side_face)
+
+    if (s.face_id) {
+      const newFaceResult = await registerNewFace(
+        s.face_id,
+        faceImages.front,
+        faceImages.left ? faceImages.left : faceImages.front,
+        faceImages.right ? faceImages.right : faceImages.front
+      );
+
+      console.log(`info - register new face result for student id ${s.id}: `, newFaceResult.data);
+
+      if (
+        newFaceResult.data.code == "1000" ||
+        newFaceResult.data.code == "709"
+      ) {
+        list.push({ id: s.id, face_id: newFaceResult.data.person_id });
+        continue;
+      }
+
+      let status = newFaceResult.data.status;
+      if (newFaceResult.data.code == "1001") {
+        status = "Poor image quality";
+      }
+      failed_list.push(`${++count}. ${s.last_name} ${s.first_name}: ${status}`
+      );
+
+      continue;
+    }
+
+    const newPersonResult = await registerNewPerson(`${s.last_name} ${s.first_name}`);
+
+    console.log(`info - register new person result for student id ${s.id}: `, newPersonResult.data);
+
+    const newFaceResult = await registerNewFace(
+      newPersonResult.data.person_id,
+      faceImages.front,
+      faceImages.left ? faceImages.left : faceImages.front,
+      faceImages.right ? faceImages.right : faceImages.front
+    );
+
+    console.log(`info - register new face result for student id ${s.id}: `, newFaceResult.data);
+
+    if (
+      newFaceResult.data.code == "1000" ||
+      newFaceResult.data.code == "709"
+    ) {
+      list.push({ id: s.id, face_id: newFaceResult.data.person_id });
+      continue;
+    }
+
+    let status = newFaceResult.data.status;
+    if (newFaceResult.data.code == "1001") {
+      status = "Poor image quality";
+    }
+    failed_list.push(`${++count}. ${s.last_name} ${s.first_name}: ${status}`
+    );
+
+    continue;
+  }
+
+  if (list.length > 0) {
+    const result = await performBatchUpdate(ctx, list);
+    if (
+      result &&
+      Array.isArray(result.failedItems) &&
+      result.failedItems.length > 0
+    ) {
+      console.log(
+        "Faces are registered for other student: ",
+        result.failedItems
+      );
+    }
+  }
+
+  if (failed_list.length > 0) {
+    res
+      .status(500)
+      .send({ success: true, failed_list: failed_list.join("\n\n") });
+  } else {
+    res.send({ success: true });
+  }
+};
+
+async function compositeFaceImages(frontalImgId: string, leftImgId: string, rightImgId: string) {
+  let frontalImg = ((await axios({ url: `${ASSET_URL}/${frontalImgId}`, responseType: "arraybuffer" })).data as Buffer).toString("base64");
+
+  let leftImg
+
+  if (leftImgId) {
+    leftImg = ((await axios({ url: `${ASSET_URL}/${leftImgId}`, responseType: "arraybuffer" })).data as Buffer).toString("base64");
+  }
+
+  let rightImg
+  if (rightImg) {
+    rightImg = ((await axios({ url: `${ASSET_URL}/${rightImgId}`, responseType: "arraybuffer" })).data as Buffer).toString("base64");
+  }
+  return {
+    front: frontalImg,
+    left: leftImg,
+    right: rightImg
+  }
 }
+
 
 async function performBatchUpdate(ctx: EndpointExtensionContext, students) {
   const { database } = ctx;
@@ -541,11 +431,11 @@ async function registerNewPerson(fullName: string) {
   });
 }
 
-export const handleUpdateStudentClass =
+export const handleUpdateClassForStudents =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
     const { database } = ctx;
     const body = req.body;
-    console.log("thuyyy_body: ", body);
+    console.log("info - update current class request body: ", body);
 
     const studentIds = body.students
       .replace(/\[/g, "")
@@ -553,8 +443,7 @@ export const handleUpdateStudentClass =
       .split(",");
     const classId = body.class;
 
-    console.log("thuyyy_studentIds: ", studentIds);
-    console.log("thuyyy_classId: ", classId);
+    console.log("info - student id list: ", studentIds);
 
     database.transaction((trx) => {
       const queries = [];
@@ -580,7 +469,7 @@ export const handleUpdateStudentClass =
 export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
   const { database } = ctx;
   const body = req.body;
-  console.log("gen_class_daily_report_request_body: ", body);
+  console.log("info - gen class daily report request body: ", body);
 
   if (!body.class || !body.date) {
     res.status(400).send({ error: "Bad Request" })
@@ -628,7 +517,7 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
     .table("class_daily_reports")
     .insert(report)
 
-  console.log(`Class' daily report generated for class id ${class_id}: `, report)
+  console.log(`info - lass' daily report generated for class id ${class_id}: `, report)
 
   res.send({ success: true, data: report });
 };
@@ -685,7 +574,7 @@ export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (re
     .table("school_daily_reports")
     .insert(report)
 
-  console.log(`School's daily report generated for school id ${school_id}: `, report)
+  console.log(`info - school's daily report generated for school id ${school_id}: `, report)
 
   res.send({ success: true, data: report });
 };
@@ -717,7 +606,7 @@ async function addSchoolCicoRecords(ctx: EndpointExtensionContext, school_id: nu
   const students = await database
     .table("students")
     .select("id", "current_class", "last_name", "first_name")
-    .where("school",school_id)
+    .where("school", school_id)
     .where("status", "active")
 
   await database.transaction(
@@ -791,7 +680,7 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
       s.with_notice = with_notice_map.get(s.id)
     }
   }
-  
+
   const sumary =JSON.stringify(students)
 
 
@@ -799,12 +688,12 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
 
 
   await database.table("class_reports")
-  .insert({
+    .insert({
     "class":body.class,
     "from":body.from,
     "to":body.to,
     "sumary":JSON.stringify(students)
-  })
+    })
 
   res.send({ success: true });
 };

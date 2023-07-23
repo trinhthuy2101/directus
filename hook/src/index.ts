@@ -12,124 +12,122 @@ export default defineHook(({ action }, context) => {
   context.emitter.onAction("items.create", onCreateItems(context))
 });
 
-const onCreateItems =
-  (context: HookExtensionContext): ActionHandler =>
-    async (input, { database, schema }) => {
-      if (!["cico_photos", "students"].includes(input.collection)) return input;
+const onCreateItems = (context: HookExtensionContext): ActionHandler => async (input, { database, schema }) => {
+  if (!["cico_photos", "students"].includes(input.collection)) return input;
 
-      const student = await database({ s: 'students', p: 'directus_users' })
-        .select({
-          id: 's.id',
-          current_class: "s.current_class",
-          last_name: "s.last_name",
-          first_name: "s.first_name",
-          expo_push_token: "p.expo_push_token",
-          parent_email: "p.email"
-        })
-        .whereRaw('?? = ??', ['s.parent_account', 'p.id']).first()
+  const student = await database({ s: 'students', p: 'directus_users' })
+    .select({
+      id: 's.id',
+      current_class: "s.current_class",
+      last_name: "s.last_name",
+      first_name: "s.first_name",
+      expo_push_token: "p.expo_push_token",
+      parent_email: "p.email"
+    })
+    .whereRaw('?? = ??', ['s.parent_account', 'p.id']).first()
 
-      if (!student) {
-        console.log("failed to get student from db")
-        return input
+  if (!student) {
+    console.log("failed to get student from db")
+    return input
+  }
+
+  console.log("student: ", student)
+  const studentFullName = student.last_name + " " + student.first_name;
+
+  if (student.expo_push_token) {
+    var message
+
+    if (input.payload.checkin) {
+      message = {
+        'to': student.expo_push_token,
+        'sound': 'default',
+        'title': 'Original Title',
+        'body': 'checkin',
+        'data': {
+          "student_id": input.payload.student,
+          "date": input.payload.date,
+          "type": "checkin",
+          "message": input.payload.date + ": Xác nhận điểm danh vào lớp bé " + studentFullName,
+        },
+      };
+    }
+    else if (input.payload.checkout) {
+      message = {
+        'to': student.expo_push_token,
+        'sound': 'default',
+        'title': 'Original Title',
+        'body': 'checkout',
+        'data': {
+          "student_id": input.payload.student,
+          "date": input.payload.date,
+          "type": "checkout",
+          "message": input.payload.date + ": Xác nhận điểm danh ra về bé " + studentFullName
+        },
+      };
+    }
+
+    await axios.post('https://exp.host/--/api/v2/push/send', JSON.stringify(message), {
+      headers: {
+        'Accept': 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
       }
+    })
 
-      console.log("student: ", student)
-      const studentFullName = student.last_name + " " + student.first_name;
+    console.log("notification sent for student id: ", student.id)
+  }
+  else if (student.parent_email) {
+    const frameURL = await getFrameURL(student.current_class, database)
+    let mailPayload
 
-      if (student.expo_push_token) {
-        var message
+    if (input.payload.checkin) {
+      const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
+      const checkinBuffer: Buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
 
-        if (input.payload.checkin) {
-          message = {
-            'to': student.expo_push_token,
-            'sound': 'default',
-            'title': 'Original Title',
-            'body': 'checkin',
-            'data': {
-              "student_id": input.payload.student,
-              "date": input.payload.date,
-              "type": "checkin",
-              "message": input.payload.date + ": Xác nhận điểm danh vào lớp bé " + studentFullName,
-            },
-          };
-        }
-        else if (input.payload.checkout) {
-          message = {
-            'to': student.expo_push_token,
-            'sound': 'default',
-            'title': 'Original Title',
-            'body': 'checkout',
-            'data': {
-              "student_id": input.payload.student,
-              "date": input.payload.date,
-              "type": "checkout",
-              "message": input.payload.date + ": Xác nhận điểm danh ra về bé " + studentFullName
-            },
-          };
-        }
-
-        await axios.post('https://exp.host/--/api/v2/push/send', JSON.stringify(message), {
-          headers: {
-            'Accept': 'application/json',
-            'Accept-encoding': 'gzip, deflate',
-            'Content-Type': 'application/json',
-          }
-        })
-
-        console.log("notification sent for student id: ", student.id)
+      mailPayload = {
+        from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
+        to: student.parent_email,
+        subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh vào lớp bé" + studentFullName,
+        html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
+        attachments: [
+          {
+            filename: "image.png",
+            content: checkinBuffer,
+            cid: "student_checkin_id",
+          },
+        ],
       }
-      else if (student.parent_email) {
-        const frameURL = await getFrameURL(student.current_class, database)
-        let mailPayload
+    }
+    else if (input.payload.checkout) {
+      const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
+      const checkoutBuffer: Buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
 
-        if (input.payload.checkin) {
-          const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
-          const checkinBuffer: Buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
-
-          mailPayload = {
-            from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
-            to: student.parent_email,
-            subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh vào lớp bé" + studentFullName,
-            html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
-            attachments: [
-              {
-                filename: "image.png",
-                content: checkinBuffer,
-                cid: "student_checkin_id",
-              },
-            ],
-          }
-        }
-        else if (input.payload.checkout) {
-          const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
-          const checkoutBuffer: Buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
-
-          mailPayload = {
-            from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
-            to: student.parent_email,
-            subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh ra về bé" + studentFullName,
-            html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
-            attachments: [
-              {
-                filename: "image.png",
-                content: checkoutBuffer,
-                cid: "student_checkout_id",
-              },
-            ],
-          }
-        }
-        else {
-          return input
-        }
-
-        const mailService = new context.services.MailService({ schema, knex: database });
-        const mailer: Transporter = mailService.mailer;
-        await mailer.sendMail(mailPayload);
-        console.log("Mail sent for student id: ", student.id);
+      mailPayload = {
+        from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
+        to: student.parent_email,
+        subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh ra về bé" + studentFullName,
+        html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
+        attachments: [
+          {
+            filename: "image.png",
+            content: checkoutBuffer,
+            cid: "student_checkout_id",
+          },
+        ],
       }
+    }
+    else {
+      return input
+    }
 
-      return input;
-    };
+    const mailService = new context.services.MailService({ schema, knex: database });
+    const mailer: Transporter = mailService.mailer;
+    await mailer.sendMail(mailPayload);
+    console.log("Mail sent for student id: ", student.id);
+  }
+
+  return input;
+};
 
 async function getFrameURL(class_id: number, database: any) {
   const frameSettings = await database
