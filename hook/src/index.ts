@@ -31,7 +31,7 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
     return input
   }
 
-  console.log("student: ", student)
+  console.log("student get from db: ", student)
   const studentFullName = student.last_name + " " + student.first_name;
 
   if (student.expo_push_token) {

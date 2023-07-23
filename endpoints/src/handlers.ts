@@ -656,8 +656,8 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
     .where("date", "<=", body.to)
     .where("checkin", null).where("checkout", null)
     .count({ 'total absent days': '*' }).groupBy("student", "student_name")
-  
-    console.log("gen class report students with total absent days: ",students)
+
+  console.log("gen class report students with total absent days: ", students)
 
   const with_notice = await database
     .table("cico_photos")
@@ -668,7 +668,7 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
     .where("checkin", null).where("checkout", null).where("absence", '1')
     .count({ count: '*' }).groupBy("student")
 
-    console.log("gen class report students with noticed absent days: ",with_notice)
+  console.log("gen class report students with noticed absent days: ", with_notice)
 
   const with_notice_map = new Map();
   with_notice.forEach(item => {
@@ -681,19 +681,62 @@ export const generateClassReports = (ctx: EndpointExtensionContext) => async (re
     }
   }
 
-  const sumary =JSON.stringify(students)
+  const sumary = JSON.stringify(students)
 
 
-  console.log("generate class reports students with total absent days and days with notice: ", )
+  console.log("generate class reports students with total absent days and days with notice: ",)
 
 
   await database.table("class_reports")
     .insert({
-    "class":body.class,
-    "from":body.from,
-    "to":body.to,
-    "sumary":JSON.stringify(students)
+      "class": body.class,
+      "from": body.from,
+      "to": body.to,
+      "sumary": JSON.stringify(students)
     })
+
+  res.send({ success: true });
+};
+
+export const convertFaceIdToId = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+
+  console.log("info - convert face id to id request body: ", body)
+
+  if (body.photo=="" || body.face_ids==""||!body.face_ids) {
+    res.status(400).send({ success: false, error: "Invalid Request" });
+  }
+
+  const face_ids = body.face_ids
+    .replace(/\[/g, "")
+    .replace(/\]/g, "")
+    .split(",");
+
+  console.log("info - face id after coverting from string to array: ", face_ids)
+
+  const students = (await database
+    .table("students")
+    .select("id")
+    .whereIn("face_id", face_ids)).map(item=>item.id)
+
+  console.log("info - students id get from db: ", students)
+
+  database.transaction((trx) => {
+    const queries = [];
+    for (let i in students) {
+      const query = database("photos_students")
+        .insert({
+          photo: body.photo,
+          student: students[i],
+        })
+        .transacting(trx);
+
+      queries.push(query);
+    }
+
+    Promise.all(queries).then(trx.commit).catch(trx.rollback);
+  });
 
   res.send({ success: true });
 };
