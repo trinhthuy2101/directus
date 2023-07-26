@@ -1,7 +1,7 @@
 import { EndpointExtensionContext } from "@directus/shared/types";
 import e, { Response } from "express";
 import axios from "axios";
-import { access } from "fs";
+
 const ASSET_URL = "http://3.0.100.91:8055/assets";
 
 export const handleUpsertFrameSettings =
@@ -31,7 +31,13 @@ export const handleUpsertFrameSettings =
 
 export const handleUpsertCicoPhotos =
   (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
-    const body = req.body;
+    let body = req.body;
+
+    console.log("info - upsert cico photos request body: ", body);
+
+    if(body.checkin || body.checkout) {
+      body.absence = '0';
+    }
 
     let mergeFields = [
       "checkin",
@@ -342,6 +348,7 @@ async function compositeFaceImages(frontalImgId: string, leftImgId: string, righ
   if (rightImg) {
     rightImg = ((await axios({ url: `${ASSET_URL}/${rightImgId}`, responseType: "arraybuffer" })).data as Buffer).toString("base64");
   }
+
   return {
     front: frontalImg,
     left: leftImg,
@@ -618,7 +625,8 @@ async function addSchoolCicoRecords(ctx: EndpointExtensionContext, school_id: nu
           "class_id": s.current_class,
           "school_id": school_id,
           "date": date,
-          "student_name": s.last_name + " " + s.first_name
+          "student_name": s.last_name + " " + s.first_name,
+          "absence": 2
         }
 
         queries.push(
