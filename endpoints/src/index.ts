@@ -14,5 +14,6 @@ export default defineEndpoint({
     router.post("/gen_cico_records_automatically",h.generateCicoRecords(ctx))
     router.post("/generate_class_reports",h.generateClassReports(ctx))
     router.post("/handle_convert_face_id_to_student_id",h.convertFaceIdToId(ctx))
+    router.post("/upgrade_for_a_class",h.upgradeAClass(ctx))
   },
 });

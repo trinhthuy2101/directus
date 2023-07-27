@@ -44,10 +44,12 @@ export const handleUpsertCicoPhotos =
       "checkout",
       "absence_reason",
       "absence",
-      "register_picker",
+      "registered_picker",
       "picker_name",
       "picker",
-      "picking_confirmed_by_parent"
+      "picking_confirmed_by_parent",
+      "student_name",
+      "school_id"
     ].reduce((prev, value) => {
       prev.set(value, true);
       return prev;
@@ -745,6 +747,51 @@ export const convertFaceIdToId = (ctx: EndpointExtensionContext) => async (req: 
 
     Promise.all(queries).then(trx.commit).catch(trx.rollback);
   });
+
+  res.send({ success: true });
+};
+
+export const upgradeAClass = (ctx: EndpointExtensionContext) => async (req: any, res: Response) => {
+  const { database } = ctx;
+  const body = req.body;
+
+  console.log("info - upgrade a class request body: ", re)
+
+  // if (!body||!body.class||!body.class_name) {
+  //   res.status(400).send({ success: false, error: "Invalid Request" });
+  // }
+
+  // const students = (await database
+  //   .table("students")
+  //   .select("id","school")
+  //   .where("class", body.class))
+
+  // console.log("info - student ids get from db: ", students)
+
+  // if (students.length==0) {
+  //   res.status(400).send({ success: false });
+  // }
+
+  // const class_id = await database.table("classes").insert({
+  //   "name": body.class_name,
+  //   "school": students[0].school
+  // })
+
+  // database.transaction((trx) => {
+  //   const queries = [];
+  //   for (let s of students) {
+  //     const query = database("photos_students")
+  //       .insert({
+  //         photo: body.photo,
+  //         student: s.id,
+  //       })
+  //       .transacting(trx);
+
+  //     queries.push(query);
+  //   }
+
+  //   Promise.all(queries).then(trx.commit).catch(trx.rollback);
+  // });
 
   res.send({ success: true });
 };
