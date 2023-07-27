@@ -30,7 +30,7 @@ System_Boundary(ec2,"AWS EC2","Amazon Elastic Compute Cloud"){
 
 Container(expo_noti, "EXPO's Push API", "Expo's Push Notification Service", $sprite="server", $tags="thirdparty")
 
-Container(payoo, "PAYOO", "Face Recognition Service", $sprite="server", $tags="thirdparty")
+Container(payoo, "", "Face Recognition Service", $sprite="server", $tags="thirdparty")
 
 Rel(teacher, app, "Use", "")
 Rel(parent, app, "Use", "")

@@ -146,14 +146,14 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
       message = {
         'to': student.expo_push_token,
         'sound': 'default',
-        'title': 'Original Title',
-        'body': 'checkin',
+        'title': 'Xác nhận điểm danh vào lớp',
+        'body': input.payload.date + ": Xác nhận điểm danh vào lớp bé " + studentFullName,
         'data': {
           "checkin": input.payload.checkin,
           "student_id": input.payload.student,
           "datetime": new Date().toString(),
           "date": input.payload.date,
-          "type": "checkin",
+          "type": "cico",
           "message": input.payload.date + ": Xác nhận điểm danh vào lớp bé " + studentFullName,
         },
       };
@@ -163,14 +163,14 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
       message = {
         'to': student.expo_push_token,
         'sound': 'default',
-        'title': 'Original Title',
-        'body': 'checkout',
+        'title': 'Xác nhận điêm danh ra về',
+        'body': input.payload.date + ": Xác nhận điểm danh ra về bé " + studentFullName,
         'data': {
           "checkout": input.payload.checkout,
           "student_id": input.payload.student,
           "datetime": new Date().toString(),
           "date": input.payload.date,
-          "type": "checkout",
+          "type": "cico",
           "message": input.payload.date + ": Xác nhận điểm danh ra về bé " + studentFullName
         },
       };
@@ -196,8 +196,8 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
       message = {
         'to': student.expo_push_token,
         'sound': 'default',
-        'title': 'Original Title',
-        'body': 'picker',
+        'title': 'Yêu cầu xác nhận người đón bé',
+        'body': 'Yêu cầu xác nhận người đón bé: '+`${student.last_name} ${student.first_name}`,
         'data': {
           "registered_picker": registeredPickerResult.registered_picker,
           "picker": input.payload.picker,
@@ -206,12 +206,49 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
           "student": input.payload.student,
           "date": input.payload.date,
           "student_name": `${student.last_name} ${student.first_name}`,
-          "type": "picker",
+          "type": "picker_request",
         },
       };
     }
 
-    console.log("info - checkout noti message: ", message)
+    if (input.payload.picking_confirmed_by_parent == 1) {
+      message = {
+        'to': student.expo_push_token,
+        'sound': 'default',
+        'title': 'Phụ huynh đã xác nhận người đón bé',
+        'body': `Phụ huynh bé ${student.last_name} ${student.first_name} đã xác nhận người đón bé`,
+        'data': {
+          "class_id": student.current_class,
+          "student": input.payload.student,
+          "date": input.payload.date,
+          "student_name": `${student.last_name} ${student.first_name}`,
+          "type": "picker_response",
+        },
+      };
+    }
+
+    if (input.payload.picking_confirmed_by_parent == 0) {
+      message = {
+        'to': student.expo_push_token,
+        'sound': 'default',
+        'title': 'Phụ huynh KHÔNG xác nhận người đón bé',
+        'body': `Phụ huynh bé ${student.last_name} ${student.first_name} KHÔNG xác nhận người đón bé. Yêu cầu không cho bé ra về`,
+        'data': {
+          "class_id": student.current_class,
+          "student": input.payload.student,
+          "date": input.payload.date,
+          "student_name": `${student.last_name} ${student.first_name}`,
+          "type": "picker_response",
+        },
+      };
+    }
+
+    if (input.payload.register_picker||!message) {
+      console.log("info - end of hook without sending noti:")
+      return input
+    }
+
+    console.log("info - noti message: ", message)
 
     await axios.post('https://exp.host/--/api/v2/push/send', JSON.stringify(message), {
       headers: {
