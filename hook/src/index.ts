@@ -53,7 +53,7 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
       mailPayload = {
         from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
         to: student.parent_email,
-        subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh vào lớp bé" + studentFullName,
+        subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh vào lớp bé " + studentFullName,
         html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkin_id"/>`,
         attachments: [
           {
@@ -69,13 +69,13 @@ const onCreateItems = (context: HookExtensionContext): ActionHandler => async (i
     }
     else if (input.payload.checkout) {
       console.log("info - preparing checkout payload for sending mail:")
-      const checkinURL = `${ASSET_URL}/${input.payload.checkin}`;
-      const checkoutBuffer: Buffer = await handleDownloadAvatarWithFrame(checkinURL, frameURL);
+      const checkoutURL = `${ASSET_URL}/${input.payload.checkout}`;
+      const checkoutBuffer: Buffer = await handleDownloadAvatarWithFrame(checkoutURL, frameURL);
 
       mailPayload = {
         from: "Kinder Checkin <19120390@student.hcmus.edu.vn>",
         to: student.parent_email,
-        subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh ra về bé" + studentFullName,
+        subject: new Date(input.payload.date).toDateString() + ": Xác nhận điểm danh ra về bé " + studentFullName,
         html: `<h1>${studentFullName}</h1></br><img width="300" heigh="auto" src="cid:student_checkout_id"/>`,
         attachments: [
           {
