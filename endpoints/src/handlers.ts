@@ -493,11 +493,14 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
     .where("date", date)
 
   let a: ClassDailyReport = {
+    total: 0,
     totalAbsence: 0,
     withNotice: 0,
     withoutNotice: 0,
     absence_list: ""
   }
+
+  a.total = cicos.length
 
   for (let c of cicos) {
     if (!c.checkin && !c.checkout) {
@@ -519,7 +522,8 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
     "total_of_absent_students": a.totalAbsence,
     "with_notice": a.withNotice,
     "without_notice": a.withoutNotice,
-    "absent_list": a.absence_list
+    "absent_list": a.absence_list,
+    "total": a.total
   }
 
   await database
@@ -532,6 +536,7 @@ export const genClassDailyReport = (ctx: EndpointExtensionContext) => async (req
 };
 
 interface ClassDailyReport {
+  total: number,
   totalAbsence: number,
   withNotice: number,
   withoutNotice: number,
@@ -576,7 +581,8 @@ export const genSchoolDailyReport = (ctx: EndpointExtensionContext) => async (re
     "date": date,
     "total_of_absent_students": totalAbsence,
     "with_notice": withNotice,
-    "without_notice": withoutNotice
+    "without_notice": withoutNotice,
+    "total": cicos.length
   }
 
   await database
